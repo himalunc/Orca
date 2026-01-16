@@ -1,4 +1,4 @@
-Orca Test
+Orca
 ====
 
 I. Prerequisites
