@@ -3453,7 +3453,12 @@
 		84FFCAA90636D5B10069432F /* ORCaen792Controller.m in Sources */ = {isa = PBXBuildFile; fileRef = 84FFCAA30636D5B10069432F /* ORCaen792Controller.m */; };
 		84FFCAAA0636D5B10069432F /* ORCaen792Model.h in Headers */ = {isa = PBXBuildFile; fileRef = 84FFCAA40636D5B10069432F /* ORCaen792Model.h */; };
 		84FFCAAB0636D5B10069432F /* ORCaen792Model.m in Sources */ = {isa = PBXBuildFile; fileRef = 84FFCAA50636D5B10069432F /* ORCaen792Model.m */; };
-		860A92B42FED70EC00A3D09A /* PMS_31Y.tif in Resources */ = {isa = PBXBuildFile; fileRef = 860A92B32FED70EC00A3D09A /* PMS_31Y.tif */; };
+		860A92B42FED70EC00A3D09A /* PMS_31.tif in Resources */ = {isa = PBXBuildFile; fileRef = 860A92B32FED70EC00A3D09A /* PMS_31.tif */; };
+		860A92BA2FED77C800A3D09A /* ORPMS31Model.h in Headers */ = {isa = PBXBuildFile; fileRef = 860A92B82FED77C800A3D09A /* ORPMS31Model.h */; };
+		860A92BB2FED77C800A3D09A /* ORPMS31Controller.h in Headers */ = {isa = PBXBuildFile; fileRef = 860A92B62FED77C800A3D09A /* ORPMS31Controller.h */; };
+		860A92BC2FED77C800A3D09A /* ORPMS31Model.m in Sources */ = {isa = PBXBuildFile; fileRef = 860A92B92FED77C800A3D09A /* ORPMS31Model.m */; };
+		860A92BD2FED77C800A3D09A /* ORPMS31Controller.m in Sources */ = {isa = PBXBuildFile; fileRef = 860A92B72FED77C800A3D09A /* ORPMS31Controller.m */; };
+		860A92C02FED795E00A3D09A /* PMS31.nib in Resources */ = {isa = PBXBuildFile; fileRef = 860A92BF2FED795E00A3D09A /* PMS31.nib */; };
 		863287B12F1F22600004C519 /* ORDefender3000ModelNew.h in Headers */ = {isa = PBXBuildFile; fileRef = 863287AA2F1F22600004C519 /* ORDefender3000ModelNew.h */; };
 		863287B22F1F22600004C519 /* ORDefender3000ControllerNew.h in Headers */ = {isa = PBXBuildFile; fileRef = 863287AC2F1F22600004C519 /* ORDefender3000ControllerNew.h */; };
 		863287B32F1F22600004C519 /* ORDefender3000DecodersNew.h in Headers */ = {isa = PBXBuildFile; fileRef = 863287AE2F1F22600004C519 /* ORDefender3000DecodersNew.h */; };
@@ -7468,7 +7473,12 @@
 		84FFCAA30636D5B10069432F /* ORCaen792Controller.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = ORCaen792Controller.m; sourceTree = "<group>"; };
 		84FFCAA40636D5B10069432F /* ORCaen792Model.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = ORCaen792Model.h; sourceTree = "<group>"; };
 		84FFCAA50636D5B10069432F /* ORCaen792Model.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = ORCaen792Model.m; sourceTree = "<group>"; };
-		860A92B32FED70EC00A3D09A /* PMS_31Y.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = PMS_31Y.tif; sourceTree = "<group>"; };
+		860A92B32FED70EC00A3D09A /* PMS_31.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = PMS_31.tif; sourceTree = "<group>"; };
+		860A92B62FED77C800A3D09A /* ORPMS31Controller.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ORPMS31Controller.h; sourceTree = "<group>"; };
+		860A92B72FED77C800A3D09A /* ORPMS31Controller.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ORPMS31Controller.m; sourceTree = "<group>"; };
+		860A92B82FED77C800A3D09A /* ORPMS31Model.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ORPMS31Model.h; sourceTree = "<group>"; };
+		860A92B92FED77C800A3D09A /* ORPMS31Model.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ORPMS31Model.m; sourceTree = "<group>"; };
+		860A92BF2FED795E00A3D09A /* PMS31.nib */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; path = PMS31.nib; sourceTree = "<group>"; };
 		863287A82F1F22600004C519 /* Defender3000New.nib */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; path = Defender3000New.nib; sourceTree = "<group>"; };
 		863287A92F1F22600004C519 /* Defender3000New.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = Defender3000New.tif; sourceTree = "<group>"; };
 		863287AA2F1F22600004C519 /* ORDefender3000ModelNew.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ORDefender3000ModelNew.h; sourceTree = "<group>"; };
@@ -15271,7 +15281,12 @@
 		860A92AC2FED708100A3D09A /* PMS31 */ = {
 			isa = PBXGroup;
 			children = (
-				860A92B32FED70EC00A3D09A /* PMS_31Y.tif */,
+				860A92BF2FED795E00A3D09A /* PMS31.nib */,
+				860A92B62FED77C800A3D09A /* ORPMS31Controller.h */,
+				860A92B72FED77C800A3D09A /* ORPMS31Controller.m */,
+				860A92B82FED77C800A3D09A /* ORPMS31Model.h */,
+				860A92B92FED77C800A3D09A /* ORPMS31Model.m */,
+				860A92B32FED70EC00A3D09A /* PMS_31.tif */,
 			);
 			name = PMS31;
 			path = Source/Objects/Hardware/Serial/PMS31;
@@ -17167,6 +17182,8 @@
 				84D7913F0FFA4CD000DC81D2 /* ORKeithley6487Decoders.h in Headers */,
 				8427BF79294170E800C1C70A /* ORInFluxDBController.h in Headers */,
 				84D791410FFA4CD000DC81D2 /* ORKeithley6487Model.h in Headers */,
+				860A92BA2FED77C800A3D09A /* ORPMS31Model.h in Headers */,
+				860A92BB2FED77C800A3D09A /* ORPMS31Controller.h in Headers */,
 				84AFC24D1029F35E009F4139 /* ORVHQ224LController.h in Headers */,
 				84AFC24F1029F35E009F4139 /* ORVHQ224LDecoders.h in Headers */,
 				84AFC2511029F35E009F4139 /* ORVHQ224LModel.h in Headers */,
@@ -18423,7 +18440,7 @@
 				8408B03A0FDD447000B0206D /* MCA.png in Resources */,
 				8408B2270FDD560200B0206D /* cPCI.png in Resources */,
 				8408B23D0FDD579800B0206D /* IPE.png in Resources */,
-				860A92B42FED70EC00A3D09A /* PMS_31Y.tif in Resources */,
+				860A92B42FED70EC00A3D09A /* PMS_31.tif in Resources */,
 				8408B2830FDD5A9D00B0206D /* IPEV4.png in Resources */,
 				843E336E2DBC240C00C7A58A /* DistributedRunControl.xib in Resources */,
 				8494F8D01C440E2C00A35F8B /* MJDDewarScale.nib in Resources */,
@@ -18539,6 +18556,7 @@
 				8457BE3C11B0183500C4082D /* SIS3820Card.gif in Resources */,
 				E6653F9823A80BF900A53678 /* flashcam_minicrate.png in Resources */,
 				848822A21D2413910030B398 /* DT5725.tif in Resources */,
+				860A92C02FED795E00A3D09A /* PMS31.nib in Resources */,
 				84B3D12311BFCB8300C17CD6 /* Sql.tif in Resources */,
 				840795DE11DA562300A91442 /* edu.washington.npl.orca.Katrin.plist in Resources */,
 				84E9C357194F42140028B7E2 /* PacFP.nib in Resources */,
@@ -19529,6 +19547,8 @@
 				84E9C354194F42140028B7E2 /* ORPacFPDecoders.m in Sources */,
 				2D1AB81F0F1B9F2400E6B850 /* ORIpeSlowControlModel.m in Sources */,
 				8493D6BE0F21315300BCD331 /* ORCMC203Controller.m in Sources */,
+				860A92BC2FED77C800A3D09A /* ORPMS31Model.m in Sources */,
+				860A92BD2FED77C800A3D09A /* ORPMS31Controller.m in Sources */,
 				8493D6C00F21315300BCD331 /* ORCMC203Decoders.m in Sources */,
 				43B50A3C1CE2610D003D0146 /* ORRunningAverage.m in Sources */,
 				8472742B2A2BBBCC00916220 /* ORLNGSSlowControlsModel.m in Sources */,
