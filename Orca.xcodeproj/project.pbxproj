@@ -3453,6 +3453,7 @@
 		84FFCAA90636D5B10069432F /* ORCaen792Controller.m in Sources */ = {isa = PBXBuildFile; fileRef = 84FFCAA30636D5B10069432F /* ORCaen792Controller.m */; };
 		84FFCAAA0636D5B10069432F /* ORCaen792Model.h in Headers */ = {isa = PBXBuildFile; fileRef = 84FFCAA40636D5B10069432F /* ORCaen792Model.h */; };
 		84FFCAAB0636D5B10069432F /* ORCaen792Model.m in Sources */ = {isa = PBXBuildFile; fileRef = 84FFCAA50636D5B10069432F /* ORCaen792Model.m */; };
+		860A92B42FED70EC00A3D09A /* PMS_31Y.tif in Resources */ = {isa = PBXBuildFile; fileRef = 860A92B32FED70EC00A3D09A /* PMS_31Y.tif */; };
 		863287B12F1F22600004C519 /* ORDefender3000ModelNew.h in Headers */ = {isa = PBXBuildFile; fileRef = 863287AA2F1F22600004C519 /* ORDefender3000ModelNew.h */; };
 		863287B22F1F22600004C519 /* ORDefender3000ControllerNew.h in Headers */ = {isa = PBXBuildFile; fileRef = 863287AC2F1F22600004C519 /* ORDefender3000ControllerNew.h */; };
 		863287B32F1F22600004C519 /* ORDefender3000DecodersNew.h in Headers */ = {isa = PBXBuildFile; fileRef = 863287AE2F1F22600004C519 /* ORDefender3000DecodersNew.h */; };
@@ -7467,6 +7468,7 @@
 		84FFCAA30636D5B10069432F /* ORCaen792Controller.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = ORCaen792Controller.m; sourceTree = "<group>"; };
 		84FFCAA40636D5B10069432F /* ORCaen792Model.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = ORCaen792Model.h; sourceTree = "<group>"; };
 		84FFCAA50636D5B10069432F /* ORCaen792Model.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = ORCaen792Model.m; sourceTree = "<group>"; };
+		860A92B32FED70EC00A3D09A /* PMS_31Y.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = PMS_31Y.tif; sourceTree = "<group>"; };
 		863287A82F1F22600004C519 /* Defender3000New.nib */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; path = Defender3000New.nib; sourceTree = "<group>"; };
 		863287A92F1F22600004C519 /* Defender3000New.tif */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = Defender3000New.tif; sourceTree = "<group>"; };
 		863287AA2F1F22600004C519 /* ORDefender3000ModelNew.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ORDefender3000ModelNew.h; sourceTree = "<group>"; };
@@ -10586,6 +10588,7 @@
 				84976E34150E77F50004B444 /* Mks651c */,
 				84B6CD3B14B37E9700386BE1 /* RGA300 */,
 				8407397914CDD91F00BAD105 /* Met637 */,
+				860A92AC2FED708100A3D09A /* PMS31 */,
 				841C4DEE141FA72800F95B50 /* Met237 */,
 				84E01B592A8FC80F00EC712F /* Bt610 */,
 				8497E5EB1808605F00CE974A /* GT521 */,
@@ -15265,6 +15268,15 @@
 			path = Source/Objects/Hardware/Vme/CAEN/CV792;
 			sourceTree = SOURCE_ROOT;
 		};
+		860A92AC2FED708100A3D09A /* PMS31 */ = {
+			isa = PBXGroup;
+			children = (
+				860A92B32FED70EC00A3D09A /* PMS_31Y.tif */,
+			);
+			name = PMS31;
+			path = Source/Objects/Hardware/Serial/PMS31;
+			sourceTree = SOURCE_ROOT;
+		};
 		863287B02F1F22600004C519 /* Defender3000New */ = {
 			isa = PBXGroup;
 			children = (
@@ -18411,6 +18423,7 @@
 				8408B03A0FDD447000B0206D /* MCA.png in Resources */,
 				8408B2270FDD560200B0206D /* cPCI.png in Resources */,
 				8408B23D0FDD579800B0206D /* IPE.png in Resources */,
+				860A92B42FED70EC00A3D09A /* PMS_31Y.tif in Resources */,
 				8408B2830FDD5A9D00B0206D /* IPEV4.png in Resources */,
 				843E336E2DBC240C00C7A58A /* DistributedRunControl.xib in Resources */,
 				8494F8D01C440E2C00A35F8B /* MJDDewarScale.nib in Resources */,
