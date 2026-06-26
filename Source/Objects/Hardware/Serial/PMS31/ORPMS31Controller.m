@@ -32,123 +32,115 @@
 
 - (id) init
 {
-	self = [super initWithWindowNibName:@"PMS31"];
-	return self;
+    self = [super initWithWindowNibName:@"PMS31"];
+    return self;
 }
 
 - (void) dealloc
 {
-	[[NSNotificationCenter defaultCenter] removeObserver:self];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [blankView release];
-	[super dealloc];
+    [super dealloc];
 }
 
 - (void) awakeFromNib
 {
-
     [[plotter0 yAxis] setRngLow:0.0 withHigh:100.];
-	[[plotter0 yAxis] setRngLimitsLow:0 withHigh:10000000. withMinRng:5];
-	
+    [[plotter0 yAxis] setRngLimitsLow:0 withHigh:10000000. withMinRng:5];
+    
     [[plotter0 xAxis] setRngLow:0.0 withHigh:10000];
-	[[plotter0 xAxis] setRngLimitsLow:0.0 withHigh:200000. withMinRng:200];
-	
-	ORTimeLinePlot* aPlot = [[ORTimeLinePlot alloc] initWithTag:0 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor redColor]];
-	[aPlot setName:@"0.3 µm"];
-	[aPlot release];
-	
-	aPlot = [[ORTimeLinePlot alloc] initWithTag:1 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor greenColor]];
-	[aPlot setName:@"0.5 µm"];
-	[aPlot release];
-	
-	aPlot = [[ORTimeLinePlot alloc] initWithTag:2 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor blueColor]];
-	[aPlot setName:@"0.7 µm"];
-	[aPlot release];
-	
-	aPlot = [[ORTimeLinePlot alloc] initWithTag:3 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor blackColor]];
-	[aPlot setName:@"1.0 µm"];
-	[aPlot release];
-	
-	aPlot = [[ORTimeLinePlot alloc] initWithTag:4 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor cyanColor]];
-	[aPlot setName:@"2.0 µm"];
-	[aPlot release];
-	
-	aPlot = [[ORTimeLinePlot alloc] initWithTag:5 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor orangeColor]];
-	[aPlot setName:@"5.0 µm"];
-	[aPlot release];
+    [[plotter0 xAxis] setRngLimitsLow:0.0 withHigh:200000. withMinRng:200];
+    
+    ORTimeLinePlot* aPlot = [[ORTimeLinePlot alloc] initWithTag:0 andDataSource:self];
+    [plotter0 addPlot: aPlot];
+    [aPlot setLineColor:[NSColor redColor]];
+    [aPlot setName:@"0.3 \u00B5m"];
+    [aPlot release];
+    
+    aPlot = [[ORTimeLinePlot alloc] initWithTag:1 andDataSource:self];
+    [plotter0 addPlot: aPlot];
+    [aPlot setLineColor:[NSColor greenColor]];
+    [aPlot setName:@"0.5 \u00B5m"];
+    [aPlot release];
+    
+    aPlot = [[ORTimeLinePlot alloc] initWithTag:2 andDataSource:self];
+    [plotter0 addPlot: aPlot];
+    [aPlot setLineColor:[NSColor blueColor]];
+    [aPlot setName:@"0.7 \u00B5m"];
+    [aPlot release];
+    
+    aPlot = [[ORTimeLinePlot alloc] initWithTag:3 andDataSource:self];
+    [plotter0 addPlot: aPlot];
+    [aPlot setLineColor:[NSColor blackColor]];
+    [aPlot setName:@"1.0 \u00B5m"];
+    [aPlot release];
+    
+    aPlot = [[ORTimeLinePlot alloc] initWithTag:4 andDataSource:self];
+    [plotter0 addPlot: aPlot];
+    [aPlot setLineColor:[NSColor cyanColor]];
+    [aPlot setName:@"2.5 \u00B5m"];
+    [aPlot release];
+    
+    aPlot = [[ORTimeLinePlot alloc] initWithTag:5 andDataSource:self];
+    [plotter0 addPlot: aPlot];
+    [aPlot setLineColor:[NSColor orangeColor]];
+    [aPlot setName:@"5.0 \u00B5m"];
+    [aPlot release];
 
-	aPlot = [[ORTimeLinePlot alloc] initWithTag:6 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor brownColor]];
-	[aPlot setName:@"Temp"];
-	[aPlot release];
-	
-	aPlot = [[ORTimeLinePlot alloc] initWithTag:7 andDataSource:self];
-	[plotter0 addPlot: aPlot];
-	[aPlot setLineColor:[NSColor purpleColor]];
-	[aPlot setName:@"Humidity"];
-	[aPlot release];
-	
-	
-	[plotter0 setShowLegend:YES];
+    aPlot = [[ORTimeLinePlot alloc] initWithTag:6 andDataSource:self];
+    [plotter0 addPlot: aPlot];
+    [aPlot setLineColor:[NSColor brownColor]];
+    [aPlot setName:@"10 \u00B5m"];
+    [aPlot release];
+    
+    [plotter0 setShowLegend:YES];
 
-	[(ORTimeAxis*)[plotter0 xAxis] setStartTime: [[NSDate date] timeIntervalSince1970]];
+    [(ORTimeAxis*)[plotter0 xAxis] setStartTime: [[NSDate date] timeIntervalSince1970]];
 
-	int i;
-	for(i=0;i<8;i++){
-		[[countAlarmLimitMatrix cellAtRow:i column:0] setTag:i];
-		[[maxCountsMatrix cellAtRow:i column:0] setTag:i];
-	}
-	
-	blankView = [[NSView alloc] init];
-    basicOpsSize	= NSMakeSize(422,528);
-    processOpsSize	= NSMakeSize(385,370);
-    historyOpsSize	= NSMakeSize(422,480);
-    summaryOpsSize	= NSMakeSize(400,270);
-	
-	NSString* key = [NSString stringWithFormat: @"orca.ORRad7%u.selectedtab",[model uniqueIdNumber]];
+    int i;
+    for(i=0;i<kPMS31NumChannels;i++){
+        [[countAlarmLimitMatrix cellAtRow:i column:0] setTag:i];
+        [[maxCountsMatrix cellAtRow:i column:0] setTag:i];
+    }
+    
+    blankView = [[NSView alloc] init];
+    basicOpsSize    = NSMakeSize(422,528);
+    processOpsSize  = NSMakeSize(385,370);
+    historyOpsSize  = NSMakeSize(422,480);
+    summaryOpsSize  = NSMakeSize(400,270);
+    
+    NSString* key = [NSString stringWithFormat: @"orca.ORPMS31%u.selectedtab",[model uniqueIdNumber]];
     NSInteger index = [[NSUserDefaults standardUserDefaults] integerForKey: key];
-	if((index<0) || (index>[tabView numberOfTabViewItems]))index = 0;
-	[tabView selectTabViewItemAtIndex: index];
-	
-	NSUInteger style = [[self window] styleMask];
-	if(index == 2){
-		[[self window] setStyleMask: style | NSWindowStyleMaskResizable];
-	}
-	else {
-		[[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
-	}
-	
-	
-	[super awakeFromNib];
+    if((index<0) || (index>[tabView numberOfTabViewItems]))index = 0;
+    [tabView selectTabViewItemAtIndex: index];
+    
+    NSUInteger style = [[self window] styleMask];
+    if(index == 2){
+        [[self window] setStyleMask: style | NSWindowStyleMaskResizable];
+    }
+    else {
+        [[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
+    }
+    
+    [super awakeFromNib];
 }
 
 - (void) setModel:(id)aModel
 {
-	[super setModel:aModel];
-	[[self window] setTitle:[NSString stringWithFormat:@"Met637 (Unit %u)",[model uniqueIdNumber]]];
+    [super setModel:aModel];
+    [[self window] setTitle:[NSString stringWithFormat:@"PMS31 (Unit %u)",[model uniqueIdNumber]]];
 }
+
 - (BOOL) portLocked
 {
-	return [gSecurity isLocked:ORPMS31Lock];;
+    return [gSecurity isLocked:ORPMS31Lock];;
 }
 
 #pragma mark ***Notifications
 
 - (void) registerNotificationObservers
 {
-	NSNotificationCenter* notifyCenter = [NSNotificationCenter defaultCenter];
+    NSNotificationCenter* notifyCenter = [NSNotificationCenter defaultCenter];
     [super registerNotificationObservers];
     [notifyCenter addObserver : self
                      selector : @selector(lockChanged:)
@@ -163,369 +155,285 @@
     [notifyCenter addObserver : self
                      selector : @selector(measurementDateChanged:)
                          name : ORPMS31ModelMeasurementDateChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(countChanged:)
                          name : ORPMS31ModelCountChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(countingModeChanged:)
                          name : ORPMS31ModelCountingModeChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(cycleDurationChanged:)
                          name : ORPMS31ModelCycleDurationChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(runningChanged:)
                          name : ORPMS31ModelRunningChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(cycleStartedChanged:)
                          name : ORPMS31ModelCycleStartedChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(cycleWillEndChanged:)
                          name : ORPMS31ModelCycleWillEndChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(cycleNumberChanged:)
                          name : ORPMS31ModelCycleNumberChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
-					 selector : @selector(scaleAction:)
-						 name : ORAxisRangeChangedNotification
-					   object : nil];
-	
+                      selector : @selector(scaleAction:)
+                          name : ORAxisRangeChangedNotification
+                        object : nil];
+    
     [notifyCenter addObserver : self
-					 selector : @selector(miscAttributesChanged:)
-						 name : ORMiscAttributesChanged
-					   object : model];
-	
+                      selector : @selector(miscAttributesChanged:)
+                          name : ORMiscAttributesChanged
+                        object : model];
+    
     [notifyCenter addObserver : self
-					 selector : @selector(updateTimePlot:)
-						 name : ORRateAverageChangedNotification
-					   object : nil];
-	
+                      selector : @selector(updateTimePlot:)
+                          name : ORRateAverageChangedNotification
+                        object : nil];
+    
     [notifyCenter addObserver : self
                      selector : @selector(maxCountsChanged:)
                          name : ORPMS31ModelMaxCountsChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(countAlarmLimitChanged:)
                          name : ORPMS31ModelCountAlarmLimitChanged
-						object: model];
-
-    [notifyCenter addObserver : self
-                     selector : @selector(temperatureChanged:)
-                         name : ORPMS31ModelTemperatureChanged
-						object: model];
-
-    [notifyCenter addObserver : self
-                     selector : @selector(humidityChanged:)
-                         name : ORPMS31ModelHumidityChanged
-						object: model];
-
-    [notifyCenter addObserver : self
-                     selector : @selector(statusBitsChanged:)
-                         name : ORPMS31ModelStatusBitsChanged
-						object: model];
-
-    [notifyCenter addObserver : self
-                     selector : @selector(countUnitsChanged:)
-                         name : ORPMS31ModelCountUnitsChanged
-						object: model];
-
-    [notifyCenter addObserver : self
-                     selector : @selector(tempUnitsChanged:)
-                         name : ORPMS31ModelTempUnitsChanged
-						object: model];
-
-    [notifyCenter addObserver : self
-                     selector : @selector(holdTimeChanged:)
-                         name : ORPMS31ModelHoldTimeChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(isLogChanged:)
                          name : ORPMS31ModelIsLogChanged
-						object: model];
-	
-    [notifyCenter addObserver : self
-                     selector : @selector(actualDurationChanged:)
-                         name : ORPMS31ModelActualDurationChanged
-						object: model];	
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(timedOutChanged:)
                          name : ORSerialPortWithQueueModelTimeoutCountChanged
-						object: model];
+                        object: model];
 
     [notifyCenter addObserver : self
-                     selector : @selector(dumpInProgressChanged:)
-                         name : ORPMS31ModelDumpInProgressChanged
-						object: model];
+                     selector : @selector(slaveAddressChanged:)
+                         name : ORPMS31ModelSlaveAddressChanged
+                        object: model];
 
     [notifyCenter addObserver : self
-                     selector : @selector(dumpCountChanged:)
-                         name : ORPMS31ModelDumpCountChanged
-						object: model];
-     
-	[serialPortController registerNotificationObservers];
-	
+                     selector : @selector(baudRateChanged:)
+                         name : ORPMS31ModelBaudRateChanged
+                        object: model];
+
+    [notifyCenter addObserver : self
+                     selector : @selector(pollIntervalChanged:)
+                         name : ORPMS31ModelPollIntervalChanged
+                        object: model];
+
+    [serialPortController registerNotificationObservers];
 }
 
 - (void) updateWindow
 {
     [super updateWindow];
     [self lockChanged:nil];
-	[self measurementDateChanged:nil];
-	[self countChanged:nil];
-	[self countingModeChanged:nil];
-	[self cycleDurationChanged:nil];
-	[self runningChanged:nil];
-	[self cycleStartedChanged:nil];
-	[self cycleWillEndChanged:nil];
-	[self cycleNumberChanged:nil];
-	[self updateTimePlot:nil];
+    [self measurementDateChanged:nil];
+    [self countChanged:nil];
+    [self countingModeChanged:nil];
+    [self cycleDurationChanged:nil];
+    [self runningChanged:nil];
+    [self cycleStartedChanged:nil];
+    [self cycleWillEndChanged:nil];
+    [self cycleNumberChanged:nil];
+    [self updateTimePlot:nil];
     [self miscAttributesChanged:nil];
-	[self maxCountsChanged:nil];
-	[self countAlarmLimitChanged:nil];
-	[self temperatureChanged:nil];
-	[self humidityChanged:nil];
-	[self statusBitsChanged:nil];
-	[self countUnitsChanged:nil];
-	[self tempUnitsChanged:nil];
-	[self holdTimeChanged:nil];
-	[self isLogChanged:nil];
-	[self actualDurationChanged:nil];
-	[self timedOutChanged:nil];
-	[self dumpInProgressChanged:nil];
-	[self dumpCountChanged:nil];
-	[serialPortController updateWindow];
-}
-
-- (void) dumpCountChanged:(NSNotification*)aNote
-{
-	[dumpCountField setIntValue: [model dumpCount]];
-}
-
-- (void) dumpInProgressChanged:(NSNotification*)aNote
-{
-	[dumpInProgressField setStringValue: [model dumpInProgress]?@"Printing":@"--"];
+    [self maxCountsChanged:nil];
+    [self countAlarmLimitChanged:nil];
+    [self isLogChanged:nil];
+    [self timedOutChanged:nil];
+    [self slaveAddressChanged:nil];
+    [self baudRateChanged:nil];
+    [self pollIntervalChanged:nil];
+    [serialPortController updateWindow];
 }
 
 - (void) timedOutChanged:(NSNotification*)aNote
 {
-	[timedOutField setStringValue: [model timeoutCount]!=0 ? @"Last Command Timed Out":@""];
+    [timedOutField setStringValue: [model timeoutCount]!=0 ? @"Last Command Timed Out":@""];
 }
 
 - (void) isLogChanged:(NSNotification*)aNote
 {
-	[isLogCB setIntValue: [model isLog]];
-	[[plotter0 yAxis] setLog:[model isLog]];
-	[plotter0 setNeedsDisplay:YES];
+    [isLogCB setIntValue: [model isLog]];
+    [[plotter0 yAxis] setLog:[model isLog]];
+    [plotter0 setNeedsDisplay:YES];
 }
 
-- (void) holdTimeChanged:(NSNotification*)aNote
+- (void) slaveAddressChanged:(NSNotification*)aNote
 {
-	[holdTimeField setIntValue: [model holdTime]];
+    [slaveAddressField setIntegerValue: [model slaveAddress]];
 }
 
-- (void) actualDurationChanged:(NSNotification*)aNote
+- (void) baudRateChanged:(NSNotification*)aNote
 {
-	[actualDurationField setIntValue: [model actualDuration]];
-	[actualDuration2Field setIntValue: [model actualDuration]];
+    int baud = [model baudRate];
+    if(baud == 9600)       [baudRatePU selectItemAtIndex:0];
+    else if(baud == 19200) [baudRatePU selectItemAtIndex:1];
+    else if(baud == 115200)[baudRatePU selectItemAtIndex:2];
 }
 
-- (void) tempUnitsChanged:(NSNotification*)aNote
+- (void) pollIntervalChanged:(NSNotification*)aNote
 {
-	[tempUnitsField setStringValue: [model tempUnits]==0?@"C":@"F"];
-	[tempUnits2Field setStringValue: [model tempUnits]==0?@"C":@"F"];
-	[tempUnitsPU selectItemAtIndex: [model tempUnits]];
-}
-
-- (void) countUnitsChanged:(NSNotification*)aNote
-{
-	[countUnitsPU selectItemAtIndex: [model countUnits]]; 
-	NSString* s = @"";
-	if([model countUnits]==0)		s = @"Counts/Ft^3";
-	else if([model countUnits]==1)	s = @"Counts/L^3";
-	else if([model countUnits]==2)	s = @"Total Counts";
-	[unitsField setStringValue:s];
-	[units2Field setStringValue:s];
-	[plotter0 setYLabel:s];
-}
-
-- (void) statusBitsChanged:(NSNotification*)aNote
-{
-	int bits = [model statusBits];
-	[batteryStatusField setStringValue: (bits & 0x10) ? @"BAD":@"OK"];
-	[sensorStatusField  setStringValue:	(bits & 0x20) ? @"BAD":@"OK"];
-	[flowStatusField    setStringValue:	(bits & 0x40) ? @"BAD":@"OK"];
-	[batteryStatus2Field setStringValue: (bits & 0x10) ? @"BAD":@"OK"];
-	[sensorStatus2Field  setStringValue:	(bits & 0x20) ? @"BAD":@"OK"];
-	[flowStatus2Field    setStringValue:	(bits & 0x40) ? @"BAD":@"OK"];
-}
-
-- (void) humidityChanged:(NSNotification*)aNote
-{
-	[humidityField setFloatValue: [model humidity]];
-	[humidity2Field setFloatValue: [model humidity]];
-}
-
-- (void) temperatureChanged:(NSNotification*)aNote
-{
-	[temperatureField setFloatValue: [model temperature]];
-	[temperature2Field setFloatValue: [model temperature]];
+    [pollIntervalField setIntegerValue: [model pollInterval]];
 }
 
 - (void) countAlarmLimitChanged:(NSNotification*)aNote
 {
-	if(!aNote){
-		int i;
-		for(i=0;i<8;i++){
-			[[countAlarmLimitMatrix cellWithTag:i] setIntValue:[model countAlarmLimit:i]];
-		}
-	}
-	else {
-		int chan = [[[aNote userInfo] objectForKey:@"Channel"] intValue];
-		if(chan<8){
-			[[countAlarmLimitMatrix cellWithTag:chan] setIntValue:[model countAlarmLimit:chan]];
-		}
-	}
+    if(!aNote){
+        int i;
+        for(i=0;i<kPMS31NumChannels;i++){
+            [[countAlarmLimitMatrix cellWithTag:i] setIntValue:[model countAlarmLimit:i]];
+        }
+    }
+    else {
+        int chan = [[[aNote userInfo] objectForKey:@"Channel"] intValue];
+        if(chan<kPMS31NumChannels){
+            [[countAlarmLimitMatrix cellWithTag:chan] setIntValue:[model countAlarmLimit:chan]];
+        }
+    }
 }
 
 - (void) maxCountsChanged:(NSNotification*)aNote
 {
-	if(!aNote){
-		int i;
-		for(i=0;i<8;i++){
-			[[maxCountsMatrix cellWithTag:i] setFloatValue:[model maxCounts:i]];
-		}
-	}
-	else {
-		int chan = [[[aNote userInfo] objectForKey:@"Channel"] intValue];
-		if(chan<8){
-			[[maxCountsMatrix cellWithTag:chan] setFloatValue:[model maxCounts:chan]];
-		}
-	}
+    if(!aNote){
+        int i;
+        for(i=0;i<kPMS31NumChannels;i++){
+            [[maxCountsMatrix cellWithTag:i] setFloatValue:[model maxCounts:i]];
+        }
+    }
+    else {
+        int chan = [[[aNote userInfo] objectForKey:@"Channel"] intValue];
+        if(chan<kPMS31NumChannels){
+            [[maxCountsMatrix cellWithTag:chan] setFloatValue:[model maxCounts:chan]];
+        }
+    }
 }
 
 - (void) scaleAction:(NSNotification*)aNotification
 {
-	if(aNotification == nil || [aNotification object] == [plotter0 xAxis]){
-		[model setMiscAttributes:[(ORAxis*)[plotter0 xAxis]attributes] forKey:@"XAttributes0"];
-	};
-	
-	if(aNotification == nil || [aNotification object] == [plotter0 yAxis]){
-		[model setMiscAttributes:[(ORAxis*)[plotter0 yAxis]attributes] forKey:@"YAttributes0"];
-	};
+    if(aNotification == nil || [aNotification object] == [plotter0 xAxis]){
+        [model setMiscAttributes:[(ORAxis*)[plotter0 xAxis]attributes] forKey:@"XAttributes0"];
+    };
+    
+    if(aNotification == nil || [aNotification object] == [plotter0 yAxis]){
+        [model setMiscAttributes:[(ORAxis*)[plotter0 yAxis]attributes] forKey:@"YAttributes0"];
+    };
 }
 
 - (void) miscAttributesChanged:(NSNotification*)aNote
 {
-	
-	NSString*				key = [[aNote userInfo] objectForKey:ORMiscAttributeKey];
-	NSMutableDictionary* attrib = [model miscAttributesForKey:key];
-	
-	if(aNote == nil || [key isEqualToString:@"XAttributes0"]){
-		if(aNote==nil)attrib = [model miscAttributesForKey:@"XAttributes0"];
-		if(attrib){
-			[(ORAxis*)[plotter0 xAxis] setAttributes:attrib];
-			[plotter0 setNeedsDisplay:YES];
-			[[plotter0 xAxis] setNeedsDisplay:YES];
-		}
-	}
-	if(aNote == nil || [key isEqualToString:@"YAttributes0"]){
-		if(aNote==nil)attrib = [model miscAttributesForKey:@"YAttributes0"];
-		if(attrib){
-			[(ORAxis*)[plotter0 yAxis] setAttributes:attrib];
-			[plotter0 setNeedsDisplay:YES];
-			[[plotter0 yAxis] setNeedsDisplay:YES];
-		}
-	}
+    NSString*               key = [[aNote userInfo] objectForKey:ORMiscAttributeKey];
+    NSMutableDictionary* attrib = [model miscAttributesForKey:key];
+    
+    if(aNote == nil || [key isEqualToString:@"XAttributes0"]){
+        if(aNote==nil)attrib = [model miscAttributesForKey:@"XAttributes0"];
+        if(attrib){
+            [(ORAxis*)[plotter0 xAxis] setAttributes:attrib];
+            [plotter0 setNeedsDisplay:YES];
+            [[plotter0 xAxis] setNeedsDisplay:YES];
+        }
+    }
+    if(aNote == nil || [key isEqualToString:@"YAttributes0"]){
+        if(aNote==nil)attrib = [model miscAttributesForKey:@"YAttributes0"];
+        if(attrib){
+            [(ORAxis*)[plotter0 yAxis] setAttributes:attrib];
+            [plotter0 setNeedsDisplay:YES];
+            [[plotter0 yAxis] setNeedsDisplay:YES];
+        }
+    }
 }
 
 - (void) updateTimePlot:(NSNotification*)aNote
 {
-	if(!aNote || ([aNote object] == [model timeRate:1])){
-		[plotter0 setNeedsDisplay:YES];
-	}
+    if(!aNote || ([aNote object] == [model timeRate:0])){
+        [plotter0 setNeedsDisplay:YES];
+    }
 }
 
 - (void) cycleStartedChanged:(NSNotification*)aNote
-{	
-	NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
-	NSString* startDateString = [dateFormatter stringFromDate:[model cycleStarted]];
-	
-	[dateFormatter release];
-	if(startDateString && [model running]) [cycleStartedField setStringValue:startDateString];
-	else [cycleStartedField setStringValue:@"---"];
+{    
+    NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
+    NSString* startDateString = [dateFormatter stringFromDate:[model cycleStarted]];
+    [dateFormatter release];
+    if(startDateString && [model running]) [cycleStartedField setStringValue:startDateString];
+    else [cycleStartedField setStringValue:@"---"];
 }
 
 - (void) cycleWillEndChanged:(NSNotification*)aNote
 {
-	NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
-	NSString* endDateString   = [dateFormatter stringFromDate:[model cycleWillEnd]];
-	[dateFormatter release];
-	NSString* s;
-	if(endDateString && [model running]) {
-		if([model countingMode] == kMet637Manual)s = @"--";
-		else s = endDateString;
-	}
-	else s = @"---";
-	[cycleWillEndField setStringValue:s];
-	[cycleWillEnd2Field setStringValue:s];
+    NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
+    NSString* endDateString = [dateFormatter stringFromDate:[model cycleWillEnd]];
+    [dateFormatter release];
+    NSString* s;
+    if(endDateString && [model running]) {
+        if([model countingMode] == kPMS31Manual) s = @"--";
+        else s = endDateString;
+    }
+    else s = @"---";
+    [cycleWillEndField setStringValue:s];
+    [cycleWillEnd2Field setStringValue:s];
 }
 
 - (void) cycleNumberChanged:(NSNotification*)aNote
 {
-	[cycleNumberField setIntValue: [model cycleNumber]];
+    [cycleNumberField setIntValue: [model cycleNumber]];
 }
 
 - (void) runningChanged:(NSNotification*)aNote
 {
-	[self updateButtons];
-	[runningField setStringValue:[model running]?@"Counting":@"Idle"];
-	[running2Field setStringValue:[model running]?@"Counting":@"Idle"];
-	[self cycleStartedChanged:nil];
-	[self cycleWillEndChanged:nil];
+    [self updateButtons];
+    [runningField setStringValue:[model running]?@"Counting":@"Idle"];
+    [running2Field setStringValue:[model running]?@"Counting":@"Idle"];
+    [self cycleStartedChanged:nil];
+    [self cycleWillEndChanged:nil];
 }
 
 - (void) cycleDurationChanged:(NSNotification*)aNote
 {
-	[cycleDurationField setIntValue: [model cycleDuration]];
+    [cycleDurationField setIntValue: [model cycleDuration]];
 }
 
 - (void) countingModeChanged:(NSNotification*)aNote
 {
-	[countingModePU selectItemAtIndex: [model countingMode]];
-	[self updateButtons];
+    [countingModePU selectItemAtIndex: [model countingMode]];
+    [self updateButtons];
 }
 
 - (void) countChanged:(NSNotification*)aNote
 {
-	int i;
-	for(i=0;i<6;i++){
-		[[countMatrix cellAtRow:i column:0] setIntValue:[model count:i]];
-		[[count2Matrix cellAtRow:i column:0] setIntValue:[model count:i]];
-	}
+    int i;
+    for(i=0;i<kPMS31NumChannels;i++){
+        [[countMatrix cellAtRow:i column:0] setIntValue:[model count:i]];
+        [[count2Matrix cellAtRow:i column:0] setIntValue:[model count:i]];
+    }
 }
 
 - (void) measurementDateChanged:(NSNotification*)aNote
 {
-	[measurementDateField setStringValue: [model measurementDate]];
-	[measurementDate2Field setStringValue: [model measurementDate]];
+    [measurementDateField setStringValue: [model measurementDate]];
+    [measurementDate2Field setStringValue: [model measurementDate]];
 }
 
 - (void) checkGlobalSecurity
@@ -537,60 +445,56 @@
 
 - (void) lockChanged:(NSNotification*)aNotification
 {
-	[self updateButtons];
+    [self updateButtons];
 }
 
 - (void) updateButtons
 {
     BOOL locked = [gSecurity isLocked:ORPMS31Lock];
-	
-	[serialPortController updateButtons:locked];
+    
+    [serialPortController updateButtons:locked];
 
     [lockButton setState: locked];
     
-	if(!locked){
-		[startCycleButton setEnabled:![model running]];
-		[stopCycleButton setEnabled:[model running]];
-	}
-	else {
-		[startCycleButton setEnabled:NO];
-		[stopCycleButton setEnabled:NO];
-	}
-	[holdTimeField setEnabled:![model running] && !locked && ([model countingMode]==kMet637Auto)];
-	[cycleDurationField setEnabled:![model running] && !locked];
-	[countingModePU setEnabled:![model running] && !locked];
-	[countUnitsPU setEnabled:![model running] && !locked];
-	[tempUnitsPU setEnabled:![model running] && !locked];
-	[clearAllButton setEnabled:![model running] && !locked];
-	[dumpAllButton setEnabled:![model running]];
-	[dumpRecentButton setEnabled:![model running]];
-	
+    if(!locked){
+        [startCycleButton setEnabled:![model running]];
+        [stopCycleButton setEnabled:[model running]];
+    }
+    else {
+        [startCycleButton setEnabled:NO];
+        [stopCycleButton setEnabled:NO];
+    }
+    [cycleDurationField setEnabled:![model running] && !locked];
+    [countingModePU setEnabled:![model running] && !locked];
+    [slaveAddressField setEnabled:![model running] && !locked];
+    [baudRatePU setEnabled:![model running] && !locked];
+    [pollIntervalField setEnabled:![model running] && !locked];
 }
 
 - (void)tabView:(NSTabView *)aTabView didSelectTabViewItem:(NSTabViewItem *)tabViewItem
 {
     [[self window] setContentView:blankView];
-	NSUInteger style = [[self window] styleMask];
-	switch([tabView indexOfTabViewItem:tabViewItem]){
-		case  0: 
-			[self resizeWindowToSize:basicOpsSize];   
-			[[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
-			break;
-		case  1: 
-			[self resizeWindowToSize:processOpsSize];     
-			[[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
-			break;
-		case  2: 
-			[self resizeWindowToSize:historyOpsSize];	
-			[[self window] setStyleMask: style | NSWindowStyleMaskResizable];
-			break;
-		default: 
-			[self resizeWindowToSize:summaryOpsSize];     
-			[[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
-			break;
-	}
+    NSUInteger style = [[self window] styleMask];
+    switch([tabView indexOfTabViewItem:tabViewItem]){
+        case  0: 
+            [self resizeWindowToSize:basicOpsSize];   
+            [[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
+            break;
+        case  1: 
+            [self resizeWindowToSize:processOpsSize];     
+            [[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
+            break;
+        case  2: 
+            [self resizeWindowToSize:historyOpsSize];    
+            [[self window] setStyleMask: style | NSWindowStyleMaskResizable];
+            break;
+        default: 
+            [self resizeWindowToSize:summaryOpsSize];     
+            [[self window] setStyleMask: style & ~NSWindowStyleMaskResizable];
+            break;
+    }
     [[self window] setContentView:totalView];
-	
+    
     NSString* key = [NSString stringWithFormat: @"orca.ORPMS31%u.selectedtab",[model uniqueIdNumber]];
     NSInteger index = [tabView indexOfTabViewItem:tabViewItem];
     [[NSUserDefaults standardUserDefaults] setInteger:index forKey:key];
@@ -598,60 +502,69 @@
 
 - (void)windowDidResize:(NSNotification *)notification
 {
-	if([tabView indexOfTabViewItem:[tabView selectedTabViewItem]] == 2){
-		historyOpsSize = [[self window] frame].size; 
-	}
+    if([tabView indexOfTabViewItem:[tabView selectedTabViewItem]] == 2){
+        historyOpsSize = [[self window] frame].size; 
+    }
 }
 
 #pragma mark ***Actions
 
-- (void) isLogAction:(id)sender
+- (IBAction) isLogAction:(id)sender
 {
-	[model setIsLog:[sender intValue]];	
+    [model setIsLog:[sender intValue]];    
 }
 
-- (void) holdTimeAction:(id)sender
+- (IBAction) slaveAddressAction:(id)sender
 {
-	[model setHoldTime:[sender intValue]];	
+    [model setSlaveAddress:[sender intValue]];
+}
+
+- (IBAction) baudRateAction:(id)sender
+{
+    int index = (int)[sender indexOfSelectedItem];
+    int baud = 9600;
+    if(index == 1) baud = 19200;
+    else if(index == 2) baud = 115200;
+    [model setBaudRate:baud];
+}
+
+- (IBAction) pollIntervalAction:(id)sender
+{
+    [model setPollInterval:[sender intValue]];
 }
 
 - (IBAction) countingModeAction:(id)sender
 {
-	[model setCountingMode:(int)[sender indexOfSelectedItem]];
-}
-
-- (IBAction) tempUnitsAction:(id)sender
-{
-	[model setTempUnits:(int)[sender indexOfSelectedItem]];
+    [model setCountingMode:(int)[sender indexOfSelectedItem]];
 }
 
 - (IBAction) countAlarmLimitAction:(id)sender
 {
-	[model setIndex:(int)[[sender selectedCell] tag] countAlarmLimit:[[sender selectedCell] floatValue]];	
+    [model setIndex:(int)[[sender selectedCell] tag] countAlarmLimit:[[sender selectedCell] floatValue]];    
 }
 
 - (IBAction) maxCountsAction:(id)sender
 {
-	[model setIndex:(int)[[sender selectedCell] tag] maxCounts:[[sender selectedCell] floatValue]];
+    [model setIndex:(int)[[sender selectedCell] tag] maxCounts:[[sender selectedCell] floatValue]];
 }
 
 - (IBAction) startCycleAction:(id)sender
 {
-	[self endEditing];
+    [self endEditing];
     [model setMissedCycleCount:0];
-	[model startCycle];	
+    [model startCycle];    
 }
 
 - (IBAction) stopCycleAction:(id)sender
 {
-	[self endEditing];
+    [self endEditing];
     [model setMissedCycleCount:0];
-	[model stopCycle];	
+    [model stopCycle];    
 }
 
 - (IBAction) cycleDurationAction:(id)sender
 {
-	[model setCycleDuration:[sender intValue]];	
+    [model setCycleDuration:[sender intValue]];    
 }
 
 - (IBAction) lockAction:(id) sender
@@ -659,70 +572,19 @@
     [gSecurity tryToSetLock:ORPMS31Lock to:[sender intValue] forWindow:[self window]];
 }
 
-- (IBAction) countUnitsAction:(id)sender
-{
-	[model setCountUnits:(int)[sender indexOfSelectedItem]];
-}
-
-- (IBAction) dumpAllDataAction:(id)sender
-{
-	[model sendAllData];
-}
-
-- (IBAction) dumpNewDataAction:(id)sender
-{
-	[model sendNewData];
-}
-
-- (IBAction) clearAllAction:(id)sender
-{
-#if defined(MAC_OS_X_VERSION_10_10) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_10 // 10.10-specific
-    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-    [alert setMessageText:@"Clearing all data!"];
-    [alert setInformativeText:@"Is this really what you want?"];
-    [alert addButtonWithTitle:@"Yes, Clear All"];
-    [alert addButtonWithTitle:@"Cancel"];
-    [alert setAlertStyle:NSAlertStyleWarning];
-    
-    [alert beginSheetModalForWindow:[self window] completionHandler:^(NSModalResponse result){
-        if (result == NSAlertFirstButtonReturn){
-            [model sendClearData];
-        }
-    }];
-#else
-    NSBeginAlertSheet(@"Clearing all data!",
-                      @"Cancel",
-                      @"Yes, Clear All",
-                      nil,[self window],
-                      self,
-                      @selector(clearDataSheetDidEnd:returnCode:contextInfo:),
-                      nil,
-                      nil,@"Is this really what you want?");
-#endif
-}
-
-#if !defined(MAC_OS_X_VERSION_10_10) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_10 // 10.10-specific
-- (void) clearDataSheetDidEnd:(id)sheet returnCode:(int)returnCode contextInfo:(NSDictionary*)userInfo
-{
-    if(returnCode == NSAlertAlternateReturn){
-		[model sendClearData];	
-	}
-}
-#endif
 #pragma mark •••Data Source
 - (int) numberPointsInPlot:(id)aPlotter
 {
-	return (int)[[model timeRate:(int)[aPlotter tag]]   count];
+    return (int)[[model timeRate:(int)[aPlotter tag]]   count];
 }
 
 - (void) plotter:(id)aPlotter index:(int)i x:(double*)xValue y:(double*)yValue
 {
-	int set = (int)[aPlotter tag];
-	int count = (int)[[model timeRate:set] count];
-	int index = count-i-1;
-	*yValue = [[model timeRate:set] valueAtIndex:index];
-	*xValue = [[model timeRate:set] timeSampledAtIndex:index];
+    int set = (int)[aPlotter tag];
+    int count = (int)[[model timeRate:set] count];
+    int index = count-i-1;
+    *yValue = [[model timeRate:set] valueAtIndex:index];
+    *xValue = [[model timeRate:set] timeSampledAtIndex:index];
 }
 
 @end
-

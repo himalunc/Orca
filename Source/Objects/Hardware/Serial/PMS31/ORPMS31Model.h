@@ -23,50 +23,60 @@
 @class ORTimeRate;
 @class ORAlarm;
 
-#define kMet637CmdTimeout           2
-#define kMet637DelayTime            0.1
-#define kMet637ProbeTime            13
-#define kMet637AllowedTimeDelta     (5*60)
+// PMS31 Timing Constants
+#define kPMS31CmdTimeout          3
+#define kPMS31PollInterval        2
+#define kPMS31NumChannels         7
 
-#define kMet637Manual  0
-#define kMet637Auto    1
+// Modbus Defaults
+#define kPMS31DefaultSlaveAddr    0xFE
+#define kPMS31DefaultBaudRate     9600
+
+// Modbus Function Codes
+#define kPMS31FC_ReadHoldingReg   0x03
+#define kPMS31FC_ReadInputReg     0x04
+#define kPMS31FC_WriteSingleReg   0x06
+#define kPMS31FC_WriteMultiReg    0x10
+
+// Modbus Register Addresses
+#define kPMS31Reg_SlaveAddr       0x0000
+#define kPMS31Reg_StartStop       0x0001
+#define kPMS31Reg_CountsStart     0x0003
+#define kPMS31Reg_CountsCount     0x000E  // 14 registers (7 channels x 2)
+#define kPMS31Reg_TimeStart       0x0008
+#define kPMS31Reg_TimeCount       0x0006  // 6 registers (yr,mo,dy,hr,mn,sc)
+
+// Counting Modes
+#define kPMS31Manual  0
+#define kPMS31Auto    1
 
 @interface ORPMS31Model : ORSerialPortWithQueueModel <ORAdcProcessing>
 {
     @private
-		BOOL            delay;
-        NSMutableString* buffer;
-		NSString*		measurementDate;
-		ORTimeRate*		timeRates[8];
-		int				count[6];
-		float			maxCounts[8];
-		float			countAlarmLimit[8];
-		int				countingMode;
-		int				cycleDuration;
-		BOOL			running;
-		NSDate*			cycleStarted;
-		NSDate*			cycleWillEnd;
-		int				cycleNumber;
-		BOOL			wasRunning;
-		int				actualDuration;
-		float			temperature;
-		float			humidity;
-		int				location;
-		int				statusBits;
-		int				countUnits;
-		int				tempUnits;
-		BOOL			probing;
-		int				holdTime;
-		BOOL			isLog;
-		BOOL			dumpInProgress;
-		int				dumpCount;
-		ORAlarm*		sensorErrorAlarm;
-		ORAlarm*		lowBatteryAlarm;
-        ORAlarm*		flowErrorAlarm;
-        ORAlarm*		missingCyclesAlarm;
-		BOOL			sentStartOnce;
-		BOOL			sentStopOnce;
+        NSMutableData*  dataBuffer;
+        NSString*       measurementDate;
+        ORTimeRate*     timeRates[kPMS31NumChannels];
+        int             count[kPMS31NumChannels];
+        float           maxCounts[kPMS31NumChannels];
+        float           countAlarmLimit[kPMS31NumChannels];
+        int             countingMode;
+        int             cycleDuration;
+        BOOL            running;
+        NSDate*         cycleStarted;
+        NSDate*         cycleWillEnd;
+        int             cycleNumber;
+        BOOL            wasRunning;
+        int             location;
+        BOOL            isLog;
+        int             slaveAddress;
+        int             baudRate;
+        int             pollInterval;
+        BOOL            polling;
+        ORAlarm*        missingCyclesAlarm;
+        BOOL            sentStartOnce;
+        BOOL            sentStopOnce;
         int             missedCycleCount;
+        int             expectedResponseLength;
 }
 
 
@@ -76,29 +86,16 @@
 - (void) dataReceived:(NSNotification*)note;
 
 #pragma mark ***Accessors
-- (void) checkAlarms;
-- (int) dumpCount;
-- (void) setDumpCount:(int)aDumpCount;
-- (BOOL) dumpInProgress;
-- (void) setDumpInProgress:(BOOL)aDumpInProgress;
+- (int) slaveAddress;
+- (void) setSlaveAddress:(int)aSlaveAddress;
+- (int) baudRate;
+- (void) setBaudRate:(int)aBaudRate;
+- (int) pollInterval;
+- (void) setPollInterval:(int)aPollInterval;
 - (BOOL) isLog;
 - (void) setIsLog:(BOOL)aIsLog;
-- (int) holdTime;
-- (void) setHoldTime:(int)aHoldTime;
-- (int) tempUnits;
-- (void) setTempUnits:(int)aTempUnits;
-- (int) countUnits;
-- (void) setCountUnits:(int)aCountUnits;
-- (int) statusBits;
-- (void) setStatusBits:(int)aStatusBits;
 - (int) location;
 - (void) setLocation:(int)aLocation;
-- (float) humidity;
-- (void) setHumidity:(float)aHumidity;
-- (float) temperature;
-- (void) setTemperature:(float)aTemperature;
-- (int) actualDuration;
-- (void) setActualDuration:(int)aActualDuration;
 - (ORTimeRate*)timeRate:(int)index;
 - (int) cycleNumber;
 - (void) setCycleNumber:(int)aCycleNumber;
@@ -129,24 +126,17 @@
 - (void) startCycle;
 - (void) stopCycle;
 
-#pragma mark ***Commands
-- (void) sendAllData;
-- (void) sendNewData;
-- (void) setDate;
-- (void) sendClearData;
-- (void) sendStart;
-- (void) sendEnd;
-- (void) getSampleTime;
-- (void) getSampleMode;
-- (void) getLocation;
-- (void) getHoldTime;
-- (void) getUnits;	
-- (void) sendCountingTime:(int)aValue;
-- (void) sendCountingMode:(BOOL)aValue;
-- (void) sendID:(int)aValue;
-- (void) sendHoldTime:(int)aValue;
-- (void) sendTempUnit:(int)aTempUnit countUnits:(int)aCountUnit;
-- (void) probe;
+#pragma mark ***Modbus Commands
+- (void) readParticleCounts;
+- (void) startDetection;
+- (void) stopDetection;
+- (void) syncDeviceTime;
+
+#pragma mark ***Modbus Helpers
+- (unsigned int) modbusCalcCRC:(unsigned char*)data length:(int)length;
+- (NSData*) buildReadInputRegistersFrame:(int)startReg count:(int)regCount;
+- (NSData*) buildWriteSingleRegisterFrame:(int)reg value:(int)value;
+- (NSData*) buildWriteMultipleRegistersFrame:(int)startReg values:(int*)values count:(int)regCount;
 
 #pragma mark •••Adc Processing Protocol
 - (void)processIsStarting;
@@ -167,17 +157,8 @@
 
 @end
 
-extern NSString* ORPMS31ModelDumpCountChanged;
-extern NSString* ORPMS31ModelDumpInProgressChanged;
 extern NSString* ORPMS31ModelIsLogChanged;
-extern NSString* ORPMS31ModelHoldTimeChanged;
-extern NSString* ORPMS31ModelTempUnitsChanged;
-extern NSString* ORPMS31ModelCountUnitsChanged;
-extern NSString* ORPMS31ModelStatusBitsChanged;
 extern NSString* ORPMS31ModelLocationChanged;
-extern NSString* ORPMS31ModelHumidityChanged;
-extern NSString* ORPMS31ModelTemperatureChanged;
-extern NSString* ORPMS31ModelActualDurationChanged;
 extern NSString* ORPMS31ModelCountAlarmLimitChanged;
 extern NSString* ORPMS31ModelMaxCountsChanged;
 extern NSString* ORPMS31ModelCycleNumberChanged;
@@ -188,8 +169,9 @@ extern NSString* ORPMS31ModelCycleDurationChanged;
 extern NSString* ORPMS31ModelCountingModeChanged;
 extern NSString* ORPMS31ModelCountChanged;
 extern NSString* ORPMS31ModelMeasurementDateChanged;
-extern NSString* ORPMS31ModelPollTimeChanged;
 extern NSString* ORPMS31ModelMissedCountChanged;
+extern NSString* ORPMS31ModelSlaveAddressChanged;
+extern NSString* ORPMS31ModelBaudRateChanged;
+extern NSString* ORPMS31ModelPollIntervalChanged;
 
 extern NSString* ORPMS31Lock;
-

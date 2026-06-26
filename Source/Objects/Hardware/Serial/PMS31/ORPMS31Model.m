@@ -27,39 +27,32 @@
 #import "ORAlarm.h"
 
 #pragma mark ***External Strings
-NSString* ORPMS31ModelDumpCountChanged		  = @"ORPMS31ModelDumpCountChanged";
-NSString* ORPMS31ModelDumpInProgressChanged  = @"ORPMS31ModelDumpInProgressChanged";
-NSString* ORPMS31ModelIsLogChanged			  = @"ORPMS31ModelIsLogChanged";
-NSString* ORPMS31ModelHoldTimeChanged		  = @"ORPMS31ModelHoldTimeChanged";
-NSString* ORPMS31ModelTempUnitsChanged		  = @"ORPMS31ModelTempUnitsChanged";
-NSString* ORPMS31ModelCountUnitsChanged	  = @"ORPMS31ModelCountUnitsChanged";
-NSString* ORPMS31ModelStatusBitsChanged	  = @"ORPMS31ModelStatusBitsChanged";
-NSString* ORPMS31ModelLocationChanged		  = @"ORPMS31ModelLocationChanged";
-NSString* ORPMS31ModelHumidityChanged		  = @"ORPMS31ModelHumidityChanged";
-NSString* ORPMS31ModelTemperatureChanged	  = @"ORPMS31ModelTemperatureChanged";
-NSString* ORPMS31ModelActualDurationChanged  = @"ORPMS31ModelActualDurationChanged";
-NSString* ORPMS31ModelCountAlarmLimitChanged = @"ORPMS31ModelCountAlarmLimitChanged";
-NSString* ORPMS31ModelMaxCountsChanged		  = @"ORPMS31ModelMaxCountsChanged";
-NSString* ORPMS31ModelCycleNumberChanged	  = @"ORPMS31ModelCycleNumberChanged";
-NSString* ORPMS31ModelCycleWillEndChanged	  = @"ORPMS31ModelCycleWillEndChanged";
-NSString* ORPMS31ModelCycleStartedChanged	  = @"ORPMS31ModelCycleStartedChanged";
-NSString* ORPMS31ModelRunningChanged		  = @"ORPMS31ModelRunningChanged";
-NSString* ORPMS31ModelCycleDurationChanged   = @"ORPMS31ModelCycleDurationChanged";
-NSString* ORPMS31ModelCountingModeChanged	  = @"ORPMS31ModelCountingModeChanged";
-NSString* ORPMS31ModelCountChanged			  = @"ORPMS31ModelCount2Changed";
-NSString* ORPMS31ModelMeasurementDateChanged = @"ORPMS31ModelMeasurementDateChanged";
-NSString* ORPMS31ModelMissedCountChanged   = @"ORPMS31ModelMissedCountChanged";
+NSString* ORPMS31ModelIsLogChanged            = @"ORPMS31ModelIsLogChanged";
+NSString* ORPMS31ModelLocationChanged         = @"ORPMS31ModelLocationChanged";
+NSString* ORPMS31ModelCountAlarmLimitChanged   = @"ORPMS31ModelCountAlarmLimitChanged";
+NSString* ORPMS31ModelMaxCountsChanged        = @"ORPMS31ModelMaxCountsChanged";
+NSString* ORPMS31ModelCycleNumberChanged      = @"ORPMS31ModelCycleNumberChanged";
+NSString* ORPMS31ModelCycleWillEndChanged     = @"ORPMS31ModelCycleWillEndChanged";
+NSString* ORPMS31ModelCycleStartedChanged     = @"ORPMS31ModelCycleStartedChanged";
+NSString* ORPMS31ModelRunningChanged          = @"ORPMS31ModelRunningChanged";
+NSString* ORPMS31ModelCycleDurationChanged    = @"ORPMS31ModelCycleDurationChanged";
+NSString* ORPMS31ModelCountingModeChanged     = @"ORPMS31ModelCountingModeChanged";
+NSString* ORPMS31ModelCountChanged            = @"ORPMS31ModelCountChanged";
+NSString* ORPMS31ModelMeasurementDateChanged  = @"ORPMS31ModelMeasurementDateChanged";
+NSString* ORPMS31ModelMissedCountChanged      = @"ORPMS31ModelMissedCountChanged";
+NSString* ORPMS31ModelSlaveAddressChanged     = @"ORPMS31ModelSlaveAddressChanged";
+NSString* ORPMS31ModelBaudRateChanged         = @"ORPMS31ModelBaudRateChanged";
+NSString* ORPMS31ModelPollIntervalChanged     = @"ORPMS31ModelPollIntervalChanged";
 
 NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 @interface ORPMS31Model (private)
-- (void) addCmdToQueue:(NSString*)aCmd;
-- (void) process_response:(NSString*)theResponse;
-- (void) checkCycle;
-- (void) dumpTimeout;
-- (void) clearDelay;
+- (void) addCmdToQueue:(NSData*)aCmd;
+- (void) processModbusResponse:(NSData*)responseData;
 - (void) processOneCommandFromQueue;
-- (void) checkDate;
+- (void) pollOnce;
+- (void) startPolling;
+- (void) stopPolling;
 - (void) startDataArrivalTimeout;
 - (void) cancelDataArrivalTimeout;
 - (void) doCycleKick;
@@ -70,15 +63,19 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (id) init
 {
-	self = [super init];
-	[[self undoManager] disableUndoRegistration];
-	int i;
-	for(i=0;i<6;i++){
-		[self setIndex:i maxCounts:1000];
-		[self setIndex:i countAlarmLimit:800];
-	}
-	[[self undoManager] enableUndoRegistration];
-	return self;
+    self = [super init];
+    [[self undoManager] disableUndoRegistration];
+    slaveAddress  = kPMS31DefaultSlaveAddr;
+    baudRate      = kPMS31DefaultBaudRate;
+    pollInterval  = kPMS31PollInterval;
+    cycleDuration = 60;
+    int i;
+    for(i=0;i<kPMS31NumChannels;i++){
+        [self setIndex:i maxCounts:1000];
+        [self setIndex:i countAlarmLimit:800];
+    }
+    [[self undoManager] enableUndoRegistration];
+    return self;
 }
 
 - (void) dealloc
@@ -88,86 +85,141 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [measurementDate release];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
-    [buffer release];
-	
-	int i;
-	for(i=0;i<8;i++){
-		[timeRates[i] release];
-	}	
-	
-	[sensorErrorAlarm release];
-	[sensorErrorAlarm clearAlarm];
-
-	[lowBatteryAlarm release];
-	[lowBatteryAlarm clearAlarm];
-
-	[flowErrorAlarm release];
-	[flowErrorAlarm clearAlarm];
+    [dataBuffer release];
     
-	[missingCyclesAlarm release];
-	[missingCyclesAlarm clearAlarm];
+    int i;
+    for(i=0;i<kPMS31NumChannels;i++){
+        [timeRates[i] release];
+    }
+    
+    [missingCyclesAlarm release];
+    [missingCyclesAlarm clearAlarm];
 
-	[super dealloc];
+    [super dealloc];
 }
 
 - (void) sleep
 {
-	[NSObject cancelPreviousPerformRequestsWithTarget:self];
-	[super sleep];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [super sleep];
 }
 
 - (void) wakeUp
 {
-	[super wakeUp];
+    [super wakeUp];
 }
 
 - (void) setUpImage
 {
-	[self setImage:[NSImage imageNamed:@"PMS_31.tif"]];
+    [self setImage:[NSImage imageNamed:@"PMS_31.tif"]];
 }
 
 - (void) makeMainController
 {
-	[self linkToController:@"ORPMS31Controller"];
-}
-- (NSString*) helpURL
-{
-	return @"RS232/Met637.html";
+    [self linkToController:@"ORPMS31Controller"];
 }
 
+- (NSString*) helpURL
+{
+    return @"RS232/PMS31.html";
+}
+
+#pragma mark ***Data Received - Modbus Binary
 - (void) dataReceived:(NSNotification*)note
 {
     if([[note userInfo] objectForKey:@"serialPort"] == serialPort){
-		
-        NSString* theString = [[[[NSString alloc] initWithData:[[note userInfo] objectForKey:@"data"] 
-												      encoding:NSASCIIStringEncoding] autorelease] uppercaseString];
-	
-		//the serial port may break the data up into small chunks, so we have to accumulate the chunks until
-		//we get a full piece.
-				
-        if(!buffer)buffer = [[NSMutableString string] retain];
-        [buffer appendString:theString];	
-		
-        do {
-            NSRange lineRange = [buffer rangeOfString:@"\r\n"];
-            if(lineRange.location!= NSNotFound){
-                NSString* theResponse = [[[buffer substringToIndex:lineRange.location+1] copy] autorelease];
-                [buffer deleteCharactersInRange:NSMakeRange(0,lineRange.location+1)];      //take the cmd out of the buffer
-				
-				if([theResponse length] != 0){
-					[self process_response:theResponse];
-				}
-				if(!dumpInProgress){
-					[self setLastRequest:nil];			 //clear the last request
-					[self processOneCommandFromQueue];	 //do the next command in the queue
-				}
-
+        NSData* theData = [[note userInfo] objectForKey:@"data"];
+        
+        if(!dataBuffer) dataBuffer = [[NSMutableData data] retain];
+        [dataBuffer appendData:theData];
+        
+        // Check if we have enough bytes for a complete Modbus response
+        if([dataBuffer length] < 3) return; // need at least addr + func + 1 byte
+        
+        unsigned char* bytes = (unsigned char*)[dataBuffer bytes];
+        int len = (int)[dataBuffer length];
+        
+        // Check for Modbus error response (function code with bit 7 set)
+        if(bytes[1] & 0x80){
+            // Error response is always 5 bytes: addr + errFC + errCode + CRC(2)
+            if(len >= 5){
+                NSData* response = [NSData dataWithBytes:bytes length:5];
+                [dataBuffer replaceBytesInRange:NSMakeRange(0, 5) withBytes:NULL length:0];
+                [self processModbusResponse:response];
             }
-        } while([buffer rangeOfString:@"\r\n"].location!= NSNotFound);
-	}
+            return;
+        }
+        
+        // Determine expected response length based on function code
+        int neededLength = 0;
+        unsigned char funcCode = bytes[1];
+        
+        if(funcCode == kPMS31FC_ReadInputReg || funcCode == kPMS31FC_ReadHoldingReg){
+            // Response: addr(1) + fc(1) + byteCount(1) + data(N) + crc(2)
+            if(len >= 3){
+                int byteCount = bytes[2];
+                neededLength = 3 + byteCount + 2;
+            }
+        }
+        else if(funcCode == kPMS31FC_WriteSingleReg){
+            // Echo response: addr(1) + fc(1) + reg(2) + value(2) + crc(2) = 8
+            neededLength = 8;
+        }
+        else if(funcCode == kPMS31FC_WriteMultiReg){
+            // Response: addr(1) + fc(1) + startReg(2) + numRegs(2) + crc(2) = 8
+            neededLength = 8;
+        }
+        
+        if(neededLength > 0 && len >= neededLength){
+            NSData* response = [NSData dataWithBytes:bytes length:neededLength];
+            [dataBuffer replaceBytesInRange:NSMakeRange(0, neededLength) withBytes:NULL length:0];
+            [self processModbusResponse:response];
+        }
+    }
 }
 
 #pragma mark ***Accessors
+
+- (int) slaveAddress
+{
+    return slaveAddress;
+}
+
+- (void) setSlaveAddress:(int)aSlaveAddress
+{
+    if(aSlaveAddress < 1) aSlaveAddress = 1;
+    if(aSlaveAddress > 0xFE) aSlaveAddress = 0xFE;
+    [[[self undoManager] prepareWithInvocationTarget:self] setSlaveAddress:slaveAddress];
+    slaveAddress = aSlaveAddress;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelSlaveAddressChanged object:self];
+}
+
+- (int) baudRate
+{
+    return baudRate;
+}
+
+- (void) setBaudRate:(int)aBaudRate
+{
+    [[[self undoManager] prepareWithInvocationTarget:self] setBaudRate:baudRate];
+    baudRate = aBaudRate;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelBaudRateChanged object:self];
+}
+
+- (int) pollInterval
+{
+    return pollInterval;
+}
+
+- (void) setPollInterval:(int)aPollInterval
+{
+    if(aPollInterval < 1) aPollInterval = 1;
+    if(aPollInterval > 300) aPollInterval = 300;
+    [[[self undoManager] prepareWithInvocationTarget:self] setPollInterval:pollInterval];
+    pollInterval = aPollInterval;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelPollIntervalChanged object:self];
+}
+
 - (int) missedCycleCount
 {
     return missedCycleCount;
@@ -178,47 +230,26 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     missedCycleCount = aValue;
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelMissedCountChanged object:self];
     
-	if(((missedCycleCount >= 3) && (countingMode == kMet637Auto)) || 
-       ((missedCycleCount > 0) && (countingMode == kMet637Manual))){
-		if(!missingCyclesAlarm){
-			NSString* s = [NSString stringWithFormat:@"Met637 (Unit %u) Missing Cycles",[self uniqueIdNumber]];
-			missingCyclesAlarm = [[ORAlarm alloc] initWithName:s severity:kHardwareAlarm];
-			[missingCyclesAlarm setSticky:YES];
-            if(countingMode == kMet637Manual)[missingCyclesAlarm setHelpString:@"The particle counter did not report counts at the end of its last single cycle.\n\nThis alarm will not go away until the problem is cleared. Acknowledging the alarm will silence it."];			
-            else [missingCyclesAlarm setHelpString:@"The particle counter is not reporting counts at the end of its cycle. ORCA tried to kick start it at least three times.\n\nThis alarm will not go away until the problem is cleared. Acknowledging the alarm will silence it."];
-			[missingCyclesAlarm postAlarm];
-		}
-	}
-	else {
-		[missingCyclesAlarm clearAlarm];
-		[missingCyclesAlarm release];
-		missingCyclesAlarm = nil;
-	}
-    
-}
-
-- (int) dumpCount
-{
-    return dumpCount;
-}
-
-- (void) setDumpCount:(int)aDumpCount
-{
-    dumpCount = aDumpCount;
-
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelDumpCountChanged object:self];
-}
-
-- (BOOL) dumpInProgress
-{
-    return dumpInProgress;
-}
-
-- (void) setDumpInProgress:(BOOL)aDumpInProgress
-{
-    dumpInProgress = aDumpInProgress;
-
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelDumpInProgressChanged object:self];
+    if(((missedCycleCount >= 3) && (countingMode == kPMS31Auto)) || 
+       ((missedCycleCount > 0) && (countingMode == kPMS31Manual))){
+        if(!missingCyclesAlarm){
+            NSString* s = [NSString stringWithFormat:@"PMS31 (Unit %u) Missing Cycles",[self uniqueIdNumber]];
+            missingCyclesAlarm = [[ORAlarm alloc] initWithName:s severity:kHardwareAlarm];
+            [missingCyclesAlarm setSticky:YES];
+            if(countingMode == kPMS31Manual){
+                [missingCyclesAlarm setHelpString:@"The PMS31 particle counter did not report counts at the end of its last single cycle.\n\nThis alarm will not go away until the problem is cleared. Acknowledging the alarm will silence it."];
+            }
+            else {
+                [missingCyclesAlarm setHelpString:@"The PMS31 particle counter is not reporting counts at the end of its cycle. ORCA tried to kick start it at least three times.\n\nThis alarm will not go away until the problem is cleared. Acknowledging the alarm will silence it."];
+            }
+            [missingCyclesAlarm postAlarm];
+        }
+    }
+    else {
+        [missingCyclesAlarm clearAlarm];
+        [missingCyclesAlarm release];
+        missingCyclesAlarm = nil;
+    }
 }
 
 - (BOOL) isLog
@@ -233,106 +264,6 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelIsLogChanged object:self];
 }
 
-- (int) holdTime
-{
-    return holdTime;
-}
-
-- (void) setHoldTime:(int)aHoldTime
-{
-	if(aHoldTime<0)aHoldTime = 0;
-	if(aHoldTime>999)aHoldTime = 99;
-    [[[self undoManager] prepareWithInvocationTarget:self] setHoldTime:holdTime];
-    holdTime = aHoldTime;
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelHoldTimeChanged object:self];
-}
-
-- (int) tempUnits
-{
-    return tempUnits;
-}
-
-- (void) setTempUnits:(int)aTempUnits
-{
-	if(aTempUnits<0)aTempUnits = 0;
-	if(aTempUnits>1)aTempUnits = 1;
-    [[[self undoManager] prepareWithInvocationTarget:self] setTempUnits:tempUnits];
-    tempUnits = aTempUnits;
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelTempUnitsChanged object:self];
-}
-
-- (int) countUnits
-{
-    return countUnits;
-}
-
-- (void) setCountUnits:(int)aCountUnits
-{
-    [[[self undoManager] prepareWithInvocationTarget:self] setCountUnits:countUnits];
-    countUnits = aCountUnits;
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountUnitsChanged object:self];
-}
-
-- (int) statusBits
-{
-    return statusBits;
-}
-
-- (void) setStatusBits:(int)aStatusBits
-{
-    statusBits = aStatusBits;
-	[self checkAlarms];
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelStatusBitsChanged object:self];
-}
-
-- (void) checkAlarms
-{
-	if(statusBits & 0x10){
-		if(!lowBatteryAlarm){
-			NSString* s = [NSString stringWithFormat:@"Met637 (Unit %u)",[self uniqueIdNumber]];
-			lowBatteryAlarm = [[ORAlarm alloc] initWithName:s severity:kHardwareAlarm];
-			[lowBatteryAlarm setSticky:YES];
-			[lowBatteryAlarm setHelpString:@"The battery on the particle counter is low. Is it supposed to be running on the battery?\n\nThis alarm will not go away until the problem is cleared. Acknowledging the alarm will silence it."];
-			[lowBatteryAlarm postAlarm];
-		}
-	}
-	else {
-		[lowBatteryAlarm clearAlarm];
-		[lowBatteryAlarm release];
-		lowBatteryAlarm = nil;
-	}
-	
-	if(statusBits & 0x20){
-		if(!sensorErrorAlarm){
-			NSString* s = [NSString stringWithFormat:@"Met637 (Unit %u)",[self uniqueIdNumber]];
-			sensorErrorAlarm = [[ORAlarm alloc] initWithName:s severity:kHardwareAlarm];
-			[sensorErrorAlarm setSticky:YES];
-			[sensorErrorAlarm setHelpString:@"The sensor is reporting a hardware error.\n\nThis alarm will not go away until the problem is cleared. Acknowledging the alarm will silence it."];
-			[sensorErrorAlarm postAlarm];
-		}
-	}
-	else {
-		[sensorErrorAlarm clearAlarm];
-		[sensorErrorAlarm release];
-		sensorErrorAlarm = nil;
-	}
-	
-	if(statusBits & 0x40){
-		if(!flowErrorAlarm){
-			NSString* s = [NSString stringWithFormat:@"Met637 (Unit %u)",[self uniqueIdNumber]];
-			flowErrorAlarm = [[ORAlarm alloc] initWithName:s severity:kHardwareAlarm];
-			[flowErrorAlarm setSticky:YES];
-			[flowErrorAlarm setHelpString:@"The particle counter is reporting a flow error.\n\nThis alarm will not go away until the problem is cleared. Acknowledging the alarm will silence it."];
-			[flowErrorAlarm postAlarm];
-		}
-	}
-	else {
-		[flowErrorAlarm clearAlarm];
-		[flowErrorAlarm release];
-		flowErrorAlarm = nil;
-	}
-}
-
 - (int) location
 {
     return location;
@@ -345,81 +276,42 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelLocationChanged object:self];
 }
 
-- (float) humidity
-{
-    return humidity;
-}
-
-- (void) setHumidity:(float)aHumidity
-{
-    humidity = aHumidity;
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelHumidityChanged object:self];
-	if(timeRates[7] == nil) timeRates[7] = [[ORTimeRate alloc] init];
-	[timeRates[7] addDataToTimeAverage:humidity];
-}
-
-- (float) temperature
-{
-    return temperature;
-}
-
-- (void) setTemperature:(float)aTemperature
-{
-    temperature = aTemperature;
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelTemperatureChanged object:self];
-	if(timeRates[6] == nil) timeRates[6] = [[ORTimeRate alloc] init];
-	[timeRates[6] addDataToTimeAverage:temperature];
-
-}
-
-- (int) actualDuration
-{
-    return actualDuration;
-}
-
-- (void) setActualDuration:(int)aActualDuration
-{
-    actualDuration = aActualDuration;
-    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelActualDurationChanged object:self];
-}
-
 - (float) countAlarmLimit:(int)index
 {
-	if(index>=0 && index<8) return countAlarmLimit[index];
-	else return 0;
+    if(index>=0 && index<kPMS31NumChannels) return countAlarmLimit[index];
+    else return 0;
 }
 
 - (void) setIndex:(int)index countAlarmLimit:(float)aCountAlarmLimit
 {
-	if(index<0 || index>=8)return;
-	[[[self undoManager] prepareWithInvocationTarget:self] setIndex:index countAlarmLimit:countAlarmLimit[index]];
+    if(index<0 || index>=kPMS31NumChannels)return;
+    [[[self undoManager] prepareWithInvocationTarget:self] setIndex:index countAlarmLimit:countAlarmLimit[index]];
     countAlarmLimit[index] = aCountAlarmLimit;
-	NSMutableDictionary* userInfo = [NSMutableDictionary dictionary];
-	[userInfo setObject:[NSNumber numberWithInt:index] forKey: @"Channel"];
-
+    NSMutableDictionary* userInfo = [NSMutableDictionary dictionary];
+    [userInfo setObject:[NSNumber numberWithInt:index] forKey: @"Channel"];
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountAlarmLimitChanged object:self userInfo:userInfo];
 }
 
 - (float) maxCounts:(int)index
 {
-	if(index>=0 && index<8) return maxCounts[index];
-	else return 0;
+    if(index>=0 && index<kPMS31NumChannels) return maxCounts[index];
+    else return 0;
 }
 
 - (void) setIndex:(int)index maxCounts:(float)aMaxCounts
 {
-	if(index<0 || index>=8)return;
-	[[[self undoManager] prepareWithInvocationTarget:self] setIndex:index maxCounts:maxCounts[index]];
-	maxCounts[index] = aMaxCounts;
-	NSMutableDictionary* userInfo = [NSMutableDictionary dictionary];
-	[userInfo setObject:[NSNumber numberWithInt:index] forKey: @"Channel"];
+    if(index<0 || index>=kPMS31NumChannels)return;
+    [[[self undoManager] prepareWithInvocationTarget:self] setIndex:index maxCounts:maxCounts[index]];
+    maxCounts[index] = aMaxCounts;
+    NSMutableDictionary* userInfo = [NSMutableDictionary dictionary];
+    [userInfo setObject:[NSNumber numberWithInt:index] forKey: @"Channel"];
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelMaxCountsChanged object:self  userInfo:userInfo];
 }
 
 - (ORTimeRate*)timeRate:(int)index
 {
-	if(index>=0 && index<8) return timeRates[index];
-	else return nil;
+    if(index>=0 && index<kPMS31NumChannels) return timeRates[index];
+    else return nil;
 }
 
 - (int) cycleNumber
@@ -443,7 +335,6 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [aCycleWillEnd retain];
     [cycleWillEnd release];
     cycleWillEnd = aCycleWillEnd;
-
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCycleWillEndChanged object:self];
 }
 
@@ -458,14 +349,10 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [cycleStarted release];
     cycleStarted = aCycleStarted;
 
-	int totalTime = [self cycleDuration]; //approx start time added.
-	if(countingMode==kMet637Auto){
-		if(cycleNumber>1) totalTime += holdTime;
-		else			  totalTime += 6;
-	}
-	NSDate* endTime = [aCycleStarted dateByAddingTimeInterval:totalTime];
-	[self setCycleWillEnd:endTime]; 
-	
+    int totalTime = [self cycleDuration];
+    NSDate* endTime = [aCycleStarted dateByAddingTimeInterval:totalTime];
+    [self setCycleWillEnd:endTime]; 
+    
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCycleStartedChanged object:self];
 }
 
@@ -487,12 +374,10 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) setCycleDuration:(int)aCycleDuration
 {
-	if(aCycleDuration < 10) aCycleDuration = 10;
-	else if(aCycleDuration > 999) aCycleDuration = 999;
+    if(aCycleDuration < 10) aCycleDuration = 10;
+    else if(aCycleDuration > 9999) aCycleDuration = 9999;
     [[[self undoManager] prepareWithInvocationTarget:self] setCycleDuration:cycleDuration];
-    
     cycleDuration = aCycleDuration;
-
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCycleDurationChanged object:self];
 }
 
@@ -504,38 +389,37 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) setCountingMode:(int)aCountingMode
 {
     countingMode = aCountingMode;
-
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountingModeChanged object:self];
 }
 
 - (NSString*) countingModeString
 {
-	switch ([self countingMode]) {
-		case kMet637Manual: return @"Single Cycle";
-		case kMet637Auto:   return @"Repeating";
-		default: return @"--";
-	}
+    switch ([self countingMode]) {
+        case kPMS31Manual: return @"Single Cycle";
+        case kPMS31Auto:   return @"Repeating";
+        default: return @"--";
+    }
 }
 
 - (void) setCount:(int)index value:(int)aValue
 {
-	if(index>=0 && index<6){
-		count[index] = aValue;
-		[[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountChanged object:self];
-		if(timeRates[index] == nil) timeRates[index] = [[ORTimeRate alloc] init];
-		[timeRates[index] addDataToTimeAverage:aValue];
-	}
+    if(index>=0 && index<kPMS31NumChannels){
+        count[index] = aValue;
+        [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountChanged object:self];
+        if(timeRates[index] == nil) timeRates[index] = [[ORTimeRate alloc] init];
+        [timeRates[index] addDataToTimeAverage:aValue];
+    }
 }
 
 - (int) count:(int)index
 {
-	if(index>=0 && index<6)return count[index];
-	else return 0;
+    if(index>=0 && index<kPMS31NumChannels)return count[index];
+    else return 0;
 }
 
 - (NSString*) measurementDate
 {
-	if(!measurementDate)return @"";
+    if(!measurementDate)return @"";
     else return measurementDate;
 }
 
@@ -543,185 +427,268 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 {
     [measurementDate autorelease];
     measurementDate = [aMeasurementDate copy];    
-
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelMeasurementDateChanged object:self];
 }
 
 - (void) setUpPort
 {
-	[serialPort setSpeed:9600];
-	[serialPort setParityNone];
-	[serialPort setStopBits2:NO];
-	[serialPort setDataBits:8];
+    [serialPort setSpeed:baudRate];
+    [serialPort setParityNone];
+    [serialPort setStopBits2:NO];
+    [serialPort setDataBits:8];
 }
 
 - (void) firstActionAfterOpeningPort
 {
-	[self probe];
+    // Read particle counts once to verify communication
+    [self readParticleCounts];
 }
 
 #pragma mark ***Archival
 - (id) initWithCoder:(NSCoder*)decoder
 {
-	self = [super initWithCoder:decoder];
-	[[self undoManager] disableUndoRegistration];
-	[self setIsLog:				[decoder decodeBoolForKey:@"isLog"]];
-	[self setHoldTime:			[decoder decodeIntForKey:   @"holdTime"]];
-	[self setTempUnits:			[decoder decodeIntForKey:   @"tempUnits"]];
-	[self setCountUnits:		[decoder decodeIntForKey:   @"countUnits"]];
-	[self setLocation:			[decoder decodeIntForKey:   @"location"]];
-	wasRunning =				[decoder decodeBoolForKey:  @"wasRunning"];
-	[self setCycleDuration:		[decoder decodeIntForKey:   @"cycleDuration"]];
-	[self setCountingMode:		[decoder decodeIntForKey:   @"countingMode"]];
+    self = [super initWithCoder:decoder];
+    [[self undoManager] disableUndoRegistration];
+    [self setIsLog:         [decoder decodeBoolForKey:@"isLog"]];
+    [self setLocation:      [decoder decodeIntForKey:   @"location"]];
+    wasRunning =            [decoder decodeBoolForKey:  @"wasRunning"];
+    [self setCycleDuration: [decoder decodeIntForKey:   @"cycleDuration"]];
+    [self setCountingMode:  [decoder decodeIntForKey:   @"countingMode"]];
+    [self setSlaveAddress:  [decoder decodeIntForKey:   @"slaveAddress"]];
+    [self setBaudRate:      [decoder decodeIntForKey:   @"baudRate"]];
+    [self setPollInterval:  [decoder decodeIntForKey:   @"pollInterval"]];
+    
+    if(slaveAddress == 0) slaveAddress = kPMS31DefaultSlaveAddr;
+    if(baudRate == 0)     baudRate = kPMS31DefaultBaudRate;
+    if(pollInterval == 0) pollInterval = kPMS31PollInterval;
 
-	int i; 
-	for(i=0;i<8;i++){
-		timeRates[i] = [[ORTimeRate alloc] init];
-		[self setIndex:i countAlarmLimit:  	[decoder decodeFloatForKey: [NSString stringWithFormat:@"countAlarmLimit%d",i]]];
-		[self setIndex:i maxCounts:			[decoder decodeFloatForKey: [NSString stringWithFormat:@"maxCounts%d",i]]];
-	}
-	
-	[[self undoManager] enableUndoRegistration];
-	
-	return self;
+    int i; 
+    for(i=0;i<kPMS31NumChannels;i++){
+        timeRates[i] = [[ORTimeRate alloc] init];
+        [self setIndex:i countAlarmLimit:   [decoder decodeFloatForKey: [NSString stringWithFormat:@"countAlarmLimit%d",i]]];
+        [self setIndex:i maxCounts:         [decoder decodeFloatForKey: [NSString stringWithFormat:@"maxCounts%d",i]]];
+    }
+    
+    [[self undoManager] enableUndoRegistration];
+    return self;
 }
+
 - (void) encodeWithCoder:(NSCoder*)encoder
 {
     [super encodeWithCoder:encoder];
-    [encoder encodeBool:	isLog			forKey:@"isLog"];
-    [encoder encodeInteger:		holdTime		forKey: @"holdTime"];
-    [encoder encodeInteger:		tempUnits		forKey: @"tempUnits"];
-    [encoder encodeInteger:		countUnits		forKey: @"countUnits"];
-    [encoder encodeInteger:		location		forKey: @"location"];
-    [encoder encodeInteger:		cycleDuration	forKey: @"cycleDuration"];
-    [encoder encodeInteger:		countingMode	forKey: @"countingMode"];
-    [encoder encodeBool:	wasRunning		forKey:	@"wasRunning"];
-	int i; 
-	for(i=0;i<8;i++){
-		[encoder encodeFloat:	countAlarmLimit[i] forKey: [NSString stringWithFormat:@"countAlarmLimit%d",i]];
-		[encoder encodeFloat:	maxCounts[i]	   forKey: [NSString stringWithFormat:@"maxCounts%d",i]];
-
-	}
+    [encoder encodeBool:    isLog           forKey:@"isLog"];
+    [encoder encodeInteger: location        forKey: @"location"];
+    [encoder encodeInteger: cycleDuration   forKey: @"cycleDuration"];
+    [encoder encodeInteger: countingMode    forKey: @"countingMode"];
+    [encoder encodeBool:    wasRunning      forKey: @"wasRunning"];
+    [encoder encodeInteger: slaveAddress    forKey: @"slaveAddress"];
+    [encoder encodeInteger: baudRate        forKey: @"baudRate"];
+    [encoder encodeInteger: pollInterval    forKey: @"pollInterval"];
+    int i; 
+    for(i=0;i<kPMS31NumChannels;i++){
+        [encoder encodeFloat:   countAlarmLimit[i] forKey: [NSString stringWithFormat:@"countAlarmLimit%d",i]];
+        [encoder encodeFloat:   maxCounts[i]       forKey: [NSString stringWithFormat:@"maxCounts%d",i]];
+    }
 }
-#pragma mark *** Commands
-- (void) sendNewData
+
+#pragma mark ***Modbus Helpers
+
+- (unsigned int) modbusCalcCRC:(unsigned char*)mess length:(int)cnt
 {
-	if([serialPort isOpen]){
-		NSLog(@"Met637 (%d): Starting print of new data\n",[self uniqueIdNumber]);
-		NSLog(@"Any subsequent cmd will abort the print\n");
-	}
-	[self addCmdToQueue:@"3"]; 
+    unsigned short crc = 0xFFFF;
+    int i;
+    for(i = 0; i < cnt; i++){
+        crc = crc ^ mess[i];
+        int shift;
+        for(shift = 1; shift <= 8; shift++){
+            unsigned char lastbit = crc & 0x0001;
+            crc = crc >> 1;
+            if(lastbit == 1) crc = crc ^ 0xA001;
+        }
+    }
+    return crc;
 }
 
-- (void) sendAllData 
-{ 
-	if([serialPort isOpen]){
-		NSLog(@"Met637 (%d): Starting print of all data\n",[self uniqueIdNumber]);
-		NSLog(@"Any subsequent cmd will abort the print\n");
-	}
-	[self addCmdToQueue:@"2"]; 
+- (NSData*) buildReadInputRegistersFrame:(int)startReg count:(int)regCount
+{
+    NSMutableData* frame = [NSMutableData dataWithLength:8];
+    unsigned char* bytes = (unsigned char*)[frame mutableBytes];
+    
+    bytes[0] = (unsigned char)slaveAddress;
+    bytes[1] = kPMS31FC_ReadInputReg;
+    bytes[2] = (startReg >> 8) & 0xFF;
+    bytes[3] = startReg & 0xFF;
+    bytes[4] = (regCount >> 8) & 0xFF;
+    bytes[5] = regCount & 0xFF;
+    
+    unsigned int crc = [self modbusCalcCRC:bytes length:6];
+    bytes[6] = crc & 0xFF;        // CRC low byte first
+    bytes[7] = (crc >> 8) & 0xFF; // CRC high byte
+    
+    return frame;
 }
 
-- (void) setDate
-{ 
-#if defined(MAC_OS_X_VERSION_10_10) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_10 // 10.10-specific	
-	unsigned unitFlags = NSCalendarUnitYear | NSCalendarUnitMonth |  NSCalendarUnitDay | NSCalendarUnitMinute | NSCalendarUnitHour;
-	NSDate *today = [NSDate date];
-	NSCalendar *gregorian = [[[NSCalendar alloc]  initWithCalendarIdentifier:NSCalendarIdentifierGregorian] autorelease];
-#else
-	unsigned unitFlags = NSYearCalendarUnit | NSMonthCalendarUnit |  NSDayCalendarUnit | NSMinuteCalendarUnit | NSHourCalendarUnit;
-	NSDate *today = [NSDate date];
-	NSCalendar *gregorian = [[[NSCalendar alloc]  initWithCalendarIdentifier:NSGregorianCalendar] autorelease];
-#endif
-	NSDateComponents *comps = [gregorian components:unitFlags fromDate:today];
-	[self addCmdToQueue:[NSString stringWithFormat:@"D %02ld/%02ld/%02ld",[comps month],[comps day],[comps year]-2000]];
-	[self addCmdToQueue:[NSString stringWithFormat:@"T %02ld:%02ld",[comps hour],[comps minute]]];
+- (NSData*) buildWriteSingleRegisterFrame:(int)reg value:(int)value
+{
+    NSMutableData* frame = [NSMutableData dataWithLength:8];
+    unsigned char* bytes = (unsigned char*)[frame mutableBytes];
+    
+    bytes[0] = (unsigned char)slaveAddress;
+    bytes[1] = kPMS31FC_WriteSingleReg;
+    bytes[2] = (reg >> 8) & 0xFF;
+    bytes[3] = reg & 0xFF;
+    bytes[4] = (value >> 8) & 0xFF;
+    bytes[5] = value & 0xFF;
+    
+    unsigned int crc = [self modbusCalcCRC:bytes length:6];
+    bytes[6] = crc & 0xFF;
+    bytes[7] = (crc >> 8) & 0xFF;
+    
+    return frame;
 }
-- (void) sendClearData				{ [self addCmdToQueue:@"C\rY"]; }
-- (void) sendStart					{ [self addCmdToQueue:@"S"]; }
-- (void) sendEnd					{ [self addCmdToQueue:@"E"]; }
-- (void) getSampleTime				{ [self addCmdToQueue:@"ST"]; }
-- (void) getSampleMode				{ [self addCmdToQueue:@"SM"]; }
-- (void) getLocation				{ [self addCmdToQueue:@"ID"]; }
-- (void) getHoldTime				{ [self addCmdToQueue:@"SH"]; }
-- (void) getUnits					{ [self addCmdToQueue:@"CU\rTU"]; }
-- (void) sendCountingTime:(int)aValue { [self addCmdToQueue:[NSString stringWithFormat:@"ST %d",aValue]]; }
-- (void) sendCountingMode:(BOOL)aValue{ [self addCmdToQueue:[NSString stringWithFormat:@"SM %d",aValue]]; }
-- (void) sendID:(int)aValue			{ [self addCmdToQueue:[NSString stringWithFormat:@"ID %d",aValue]]; }
-- (void) sendHoldTime:(int)aValue	{ [self addCmdToQueue:[NSString stringWithFormat:@"SH %d",aValue]]; }
-- (void) sendTempUnit:(int)aTempUnit countUnits:(int)aCountUnit		{ [self addCmdToQueue:[NSString stringWithFormat:@"CU %d\rTU %d",aTempUnit,aCountUnit]]; }
-- (void) probe						{ probing = YES; [self getSampleTime]; }
+
+- (NSData*) buildWriteMultipleRegistersFrame:(int)startReg values:(int*)values count:(int)regCount
+{
+    int byteCount = regCount * 2;
+    int frameLength = 7 + byteCount + 2; // addr(1)+fc(1)+startReg(2)+numRegs(2)+byteCount(1)+data(N)+crc(2)
+    NSMutableData* frame = [NSMutableData dataWithLength:frameLength];
+    unsigned char* bytes = (unsigned char*)[frame mutableBytes];
+    
+    bytes[0] = (unsigned char)slaveAddress;
+    bytes[1] = kPMS31FC_WriteMultiReg;
+    bytes[2] = (startReg >> 8) & 0xFF;
+    bytes[3] = startReg & 0xFF;
+    bytes[4] = (regCount >> 8) & 0xFF;
+    bytes[5] = regCount & 0xFF;
+    bytes[6] = (unsigned char)byteCount;
+    
+    int i;
+    for(i = 0; i < regCount; i++){
+        bytes[7 + i*2]     = (values[i] >> 8) & 0xFF;
+        bytes[7 + i*2 + 1] = values[i] & 0xFF;
+    }
+    
+    int dataLen = 7 + byteCount;
+    unsigned int crc = [self modbusCalcCRC:bytes length:dataLen];
+    bytes[dataLen]     = crc & 0xFF;
+    bytes[dataLen + 1] = (crc >> 8) & 0xFF;
+    
+    return frame;
+}
+
+#pragma mark ***Modbus Commands
+
+- (void) readParticleCounts
+{
+    if([serialPort isOpen]){
+        NSData* frame = [self buildReadInputRegistersFrame:kPMS31Reg_CountsStart count:kPMS31Reg_CountsCount];
+        [self addCmdToQueue:frame];
+    }
+}
+
+- (void) startDetection
+{
+    if([serialPort isOpen]){
+        NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_StartStop value:0x0001];
+        [self addCmdToQueue:frame];
+    }
+}
+
+- (void) stopDetection
+{
+    if([serialPort isOpen]){
+        NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_StartStop value:0x0000];
+        [self addCmdToQueue:frame];
+    }
+}
+
+- (void) syncDeviceTime
+{
+    if([serialPort isOpen]){
+        unsigned unitFlags = NSCalendarUnitYear | NSCalendarUnitMonth |  NSCalendarUnitDay | NSCalendarUnitMinute | NSCalendarUnitHour | NSCalendarUnitSecond;
+        NSDate *today = [NSDate date];
+        NSCalendar *gregorian = [[[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian] autorelease];
+        NSDateComponents *comps = [gregorian components:unitFlags fromDate:today];
+        
+        int timeValues[6];
+        timeValues[0] = (int)[comps year];
+        timeValues[1] = (int)[comps month];
+        timeValues[2] = (int)[comps day];
+        timeValues[3] = (int)[comps hour];
+        timeValues[4] = (int)[comps minute];
+        timeValues[5] = (int)[comps second];
+        
+        NSData* frame = [self buildWriteMultipleRegistersFrame:kPMS31Reg_TimeStart values:timeValues count:kPMS31Reg_TimeCount];
+        [self addCmdToQueue:frame];
+    }
+}
 
 #pragma mark ***Polling and Cycles
+
 - (void) startCycle
 {
     [self startCycle:NO];
 }
+
 - (void) startCycle:(BOOL)force
 {
-	if((![self running] || force) && [serialPort isOpen]){
-		[self sendEnd];
-        [self enqueueCmd:@"++Delay"];
-		[self setCycleNumber:1];
-		NSDate* now = [NSDate date];
-		[self setCycleStarted:now];
-		[self sendCountingMode:countingMode];
-		[self sendHoldTime:holdTime];
-		[self sendTempUnit:tempUnits countUnits:countUnits];
-		[self sendCountingTime:cycleDuration];
-        [self enqueueCmd:@"++Delay"];
-		[self sendStart];
+    if((![self running] || force) && [serialPort isOpen]){
+        [self setCycleNumber:1];
+        NSDate* now = [NSDate date];
+        [self setCycleStarted:now];
+        [self syncDeviceTime];
+        [self startDetection];
+        [self setRunning:YES];
+        [self startPolling];
         [self startDataArrivalTimeout];
-		NSLog(@"Met637(%d) Starting particle counter in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
-	}
+        NSLog(@"PMS31(%d) Starting particle counter in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
+    }
 }
 
 - (void) stopCycle
 {
-	if([self running] && [serialPort isOpen]){
-		[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(checkCycle) object:nil];
-		[self setCycleNumber:0];
-		[self sendEnd];
+    if([serialPort isOpen]){
+        [self stopPolling];
+        [self stopDetection];
         [self cancelDataArrivalTimeout];
-		NSLog(@"Met637(%d) Stopping particle counter. Was in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
-	}
+        [self setCycleNumber:0];
+        [self setRunning:NO];
+        NSLog(@"PMS31(%d) Stopping particle counter. Was in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
+    }
 }
 
 
-#pragma mark •••Bit Processing Protocol
+#pragma mark •••Adc Processing Protocol
 - (void) processIsStarting
 {
-	if(!running){
-		if(!sentStartOnce){
-		   sentStartOnce = YES;
-		   sentStopOnce = NO;
+    if(!running){
+        if(!sentStartOnce){
+           sentStartOnce = YES;
+           sentStopOnce = NO;
             wasRunning = NO;
-
-			[self startCycle:YES];
-		}
-	}
+            [self startCycle:YES];
+        }
+    }
     else wasRunning = YES;
 }
 
 - (void) processIsStopping
 {
-	if(!wasRunning){
-		if(!sentStopOnce){
-			sentStopOnce = YES;
-			sentStartOnce = NO;
-			[self stopCycle];
-		}
-	}
+    if(!wasRunning){
+        if(!sentStopOnce){
+            sentStopOnce = YES;
+            sentStartOnce = NO;
+            [self stopCycle];
+        }
+    }
 }
 
-//note that everything called by these routines MUST be threadsafe
 - (void) startProcessCycle
 {    
-	@try { 
-	}
-	@catch(NSException* localException) { 
-		//catch this here to prevent it from falling thru, but nothing to do.
-	}
+    @try { 
+    }
+    @catch(NSException* localException) { 
+    }
 }
 
 - (void) endProcessCycle
@@ -730,67 +697,65 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (NSString*) identifier
 {
-	NSString* s;
- 	@synchronized(self){
-		s= [NSString stringWithFormat:@"Met637,%u",[self uniqueIdNumber]];
-	}
-	return s;
+    NSString* s;
+    @synchronized(self){
+        s= [NSString stringWithFormat:@"PMS31,%u",[self uniqueIdNumber]];
+    }
+    return s;
 }
 
 - (NSString*) processingTitle
 {
-	NSString* s;
- 	@synchronized(self){
-		s= [self identifier];
-	}
-	return s;
+    NSString* s;
+    @synchronized(self){
+        s= [self identifier];
+    }
+    return s;
 }
 
 - (double) convertedValue:(int)aChan
 {
-	double theValue = 0;
-	@synchronized(self){
-		if(aChan<6)			theValue = [self count:aChan];
-		else if(aChan==6)	theValue = [self temperature];
-		else if(aChan==7)	theValue = [self humidity];
-	}
-	return theValue;
+    double theValue = 0;
+    @synchronized(self){
+        if(aChan>=0 && aChan<kPMS31NumChannels) theValue = [self count:aChan];
+    }
+    return theValue;
 }
 
 - (double) maxValueForChan:(int)aChan
 {
-	double theValue;
-	@synchronized(self){
-		theValue = (double)[self maxCounts:aChan]; 
-	}
-	return theValue;
+    double theValue;
+    @synchronized(self){
+        theValue = (double)[self maxCounts:aChan]; 
+    }
+    return theValue;
 }
 
 - (double) minValueForChan:(int)aChan
 {
-	return 0;
+    return 0;
 }
 
 - (void) getAlarmRangeLow:(double*)theLowLimit high:(double*)theHighLimit channel:(int)channel
 {
-	@synchronized(self){
-		*theLowLimit = -.001;
-		*theHighLimit =  [self countAlarmLimit:channel]; 
-	}		
+    @synchronized(self){
+        *theLowLimit = -.001;
+        *theHighLimit =  [self countAlarmLimit:channel]; 
+    }        
 }
 
 - (BOOL) processValue:(int)channel
 {
-	BOOL r;
-	@synchronized(self){
-		r = YES;    //temp -- figure out what the process bool for this object should be.
-	}
-	return r;
+    BOOL r;
+    @synchronized(self){
+        r = YES;
+    }
+    return r;
 }
 
 - (void) setProcessOutput:(int)channel value:(int)value
 {
-    //nothing to do. not used in adcs. really shouldn't be in the protocol
+    //nothing to do
 }
 
 - (BOOL) dataForChannelValid:(int)aChannel
@@ -804,42 +769,44 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) postCouchDBRecord
 {    
+    NSMutableArray* countsArray = [NSMutableArray arrayWithCapacity:kPMS31NumChannels];
+    NSMutableArray* limitsArray = [NSMutableArray arrayWithCapacity:kPMS31NumChannels];
+    int i;
+    for(i=0;i<kPMS31NumChannels;i++){
+        [countsArray addObject:[NSNumber numberWithInt:count[i]]];
+        [limitsArray addObject:[NSNumber numberWithFloat:countAlarmLimit[i]]];
+    }
+    
     NSDictionary* values = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObjects:
-                                [NSNumber numberWithInt:count[0]],
-                                [NSNumber numberWithInt:count[1]],
-                                [NSNumber numberWithInt:count[2]],
-                                [NSNumber numberWithInt:count[3]],
-                                [NSNumber numberWithInt:count[4]],
-                                [NSNumber numberWithInt:count[5]],
-                                nil], @"counts",
-                            [NSArray arrayWithObjects:
-                                 [NSNumber numberWithInt:countAlarmLimit[0]],
-                                 [NSNumber numberWithInt:countAlarmLimit[1]],
-                                 [NSNumber numberWithInt:countAlarmLimit[2]],
-                                 [NSNumber numberWithInt:countAlarmLimit[3]],
-                                 [NSNumber numberWithInt:countAlarmLimit[4]],
-                                 [NSNumber numberWithInt:countAlarmLimit[5]],
-                                 nil], @"countLimits",
-                            [NSNumber numberWithFloat:  temperature],       @"temperature",
-                            [NSNumber numberWithFloat:  humidity],         @"humidity",
-                            [NSNumber numberWithInt:    actualDuration],   @"actualDuration",
-                            [NSNumber numberWithInt:    statusBits],       @"statusBits",
+                            countsArray, @"counts",
+                            limitsArray, @"countLimits",
                             [NSNumber numberWithInt:    cycleDuration],    @"pollTime",
                             nil];
     [[NSNotificationCenter defaultCenter] postNotificationName:@"ORCouchDBAddObjectRecord" object:self userInfo:values];
 }
 
-- (void) checkCycle
+- (void) startPolling
 {
-	[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(checkCycle) object:nil];
-	if([serialPort isOpen]){ 
-        [self probe];
-        if(running){
-            [self performSelector:@selector(checkCycle) withObject:nil afterDelay:kMet637ProbeTime];
-        }
+    [self stopPolling];
+    polling = YES;
+    [self performSelector:@selector(pollOnce) withObject:nil afterDelay:pollInterval];
+}
+
+- (void) stopPolling
+{
+    polling = NO;
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(pollOnce) object:nil];
+}
+
+- (void) pollOnce
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(pollOnce) object:nil];
+    if(polling && [serialPort isOpen]){
+        [self readParticleCounts];
+        [self performSelector:@selector(pollOnce) withObject:nil afterDelay:pollInterval];
     }
 }
+
 - (void) startDataArrivalTimeout
 {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(doCycleKick) object:nil];
@@ -855,68 +822,85 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 {
     [self setMissedCycleCount:missedCycleCount+1];
     NSLogColor([NSColor redColor],@"%@ data did not arrive at end of cycle (missed %d)\n",[self fullID],missedCycleCount);
-    if(countingMode == kMet637Auto){
+    if(countingMode == kPMS31Auto){
         NSLogColor([NSColor redColor],@"Kickstarting %@\n",[self fullID]);
-        [self setCount:0 value:0];
-        [self setCount:1 value:0];
-        [self setCount:2 value:0];
-        [self setCount:3 value:0];
-        [self setCount:4 value:0];
-        [self setCount:5 value:0];       
-        [self setTemperature:0];
-        [self setHumidity:0];
+        int i;
+        for(i=0;i<kPMS31NumChannels;i++){
+            [self setCount:i value:0];
+        }
         [self setIsValid:NO];
-
         [self stopCycle];
         [self startCycle:YES];
     }
 }
 
-
-- (void) addCmdToQueue:(NSString*)aCmd
+- (void) addCmdToQueue:(NSData*)aCmd
 {
-	if([serialPort isOpen]){ 
-		aCmd = [aCmd stringByReplacingOccurrencesOfString:@"\n" withString:@""];
-		if(![aCmd hasSuffix:@"\r"])aCmd = [aCmd stringByAppendingFormat:@"\r"];
-		
-		[self enqueueCmd:aCmd];
-		[self enqueueCmd:@"++Delay"];
-		
-		if(!lastRequest){
-			[self processOneCommandFromQueue];
-		}
-	}
-	else NSLog(@"Met637 (%d): Serial Port not open. Cmd Ignored.\n",[self uniqueIdNumber]);
+    if([serialPort isOpen]){ 
+        [self enqueueCmd:aCmd];
+        if(!lastRequest){
+            [self processOneCommandFromQueue];
+        }
+    }
+    else NSLog(@"PMS31 (%d): Serial Port not open. Cmd Ignored.\n",[self uniqueIdNumber]);
 }
 
-- (void) process_response:(NSString*)theResponse
+- (void) processModbusResponse:(NSData*)responseData
 {
-	[self setIsValid:YES];
-	theResponse = [theResponse stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-	NSArray* partsByComma = [theResponse componentsSeparatedByString:@","];
-	if([partsByComma count] >= 14 && ![theResponse hasPrefix:@"TIME"]){
-		if(!dumpInProgress){
-			[self setMeasurementDate: [partsByComma objectAtIndex:0]];
-		
-			[self setCount:0 value:[[partsByComma objectAtIndex:1] intValue]];
-			[self setCount:1 value:[[partsByComma objectAtIndex:2] intValue]];
-			[self setCount:2 value:[[partsByComma objectAtIndex:3] intValue]];
-			[self setCount:3 value:[[partsByComma objectAtIndex:4] intValue]];
-			[self setCount:4 value:[[partsByComma objectAtIndex:5] intValue]];
-			[self setCount:5 value:[[partsByComma objectAtIndex:6] intValue]];
-			
-			[self setTemperature:[[partsByComma objectAtIndex:7] floatValue]];
-			[self setHumidity:[[partsByComma objectAtIndex:8] floatValue]];
-			[self setLocation:[[partsByComma objectAtIndex:9] floatValue]];
-			[self setActualDuration:[[partsByComma objectAtIndex:10] intValue]];
-			[self setStatusBits:[[partsByComma objectAtIndex:13] intValue]];
+    unsigned char* bytes = (unsigned char*)[responseData bytes];
+    int len = (int)[responseData length];
+    
+    // Validate CRC
+    unsigned short receivedCRC = bytes[len-2] | (bytes[len-1] << 8);
+    unsigned short calcCRC = [self modbusCalcCRC:bytes length:len-2];
+    
+    if(receivedCRC != calcCRC){
+        NSLog(@"PMS31(%d): CRC mismatch in response. Expected 0x%04X, got 0x%04X\n",
+              [self uniqueIdNumber], calcCRC, receivedCRC);
+        [self setLastRequest:nil];
+        [self processOneCommandFromQueue];
+        return;
+    }
+    
+    [self setIsValid:YES];
+    
+    unsigned char funcCode = bytes[1];
+    
+    // Check for error response
+    if(funcCode & 0x80){
+        unsigned char errCode = bytes[2];
+        NSLog(@"PMS31(%d): Modbus error response. FC=0x%02X, Error=0x%02X\n",
+              [self uniqueIdNumber], funcCode & 0x7F, errCode);
+        [self setLastRequest:nil];
+        [self processOneCommandFromQueue];
+        return;
+    }
+    
+    if(funcCode == kPMS31FC_ReadInputReg){
+        // Parse particle count data
+        // Response: [addr][0x04][byteCount][data...][crc_lo][crc_hi]
+        int byteCount = bytes[2];
+        if(byteCount == kPMS31Reg_CountsCount * 2){ // 28 bytes = 14 registers
+            int i;
+            for(i = 0; i < kPMS31NumChannels; i++){
+                int offset = 3 + i * 4; // each channel = 2 registers = 4 bytes
+                unsigned int hi = (bytes[offset] << 8) | bytes[offset+1];
+                unsigned int lo = (bytes[offset+2] << 8) | bytes[offset+3];
+                unsigned int countValue = (hi << 16) | lo;
+                [self setCount:i value:(int)countValue];
+            }
+            
+            // Update measurement date
+            NSDateFormatter* dateFormatter = [[[NSDateFormatter alloc] init] autorelease];
+            [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
+            NSString* dateStr = [dateFormatter stringFromDate:[NSDate date]];
+            [self setMeasurementDate:dateStr];
             
             [self setMissedCycleCount:0];
             [self cancelDataArrivalTimeout];
-        
             [self postCouchDBRecord];
             
-            if(countingMode == kMet637Manual){
+            if(countingMode == kPMS31Manual){
                 [self stopCycle];
             }
             else {
@@ -925,132 +909,38 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
                 [self setCycleNumber:theCount+1];
                 [self setCycleStarted:[NSDate date]];
             }
-			
-            [self checkDate];
-		}
-		else {
-			theResponse = [theResponse stringByReplacingOccurrencesOfString:@"\n" withString:@""];
-			theResponse = [theResponse stringByReplacingOccurrencesOfString:@"\r" withString:@""];
-			//put in a unix time stamp for convenience
-			NSString* aDate = [partsByComma objectAtIndex:0];
-			
-			NSDateFormatter *dateFormatter = [[[NSDateFormatter alloc] init] autorelease];
-			[dateFormatter setDateFormat:@"dd-MMM-yyyy HH:mm:ss"];
-			NSDate* gmtTime = [dateFormatter dateFromString:aDate];
-			NSNumber *timestamp=[[[NSNumber alloc] initWithDouble:[gmtTime timeIntervalSince1970]] autorelease];
-			
-			NSLog(@"%d, %@, %@\n",dumpCount,timestamp,theResponse);
-			[self setDumpCount:dumpCount+1];
-			[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(dumpTimeout) object:nil];
-			[self performSelector:@selector(dumpTimeout) withObject:nil afterDelay:.5];
-		}
-	}
-	else {
-		if(([theResponse length]==1) && ([lastRequest hasPrefix:@"2"] || [lastRequest hasPrefix:@"3"])){
-			[self setDumpInProgress:YES];
-			[self setDumpCount:0];
-			[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(dumpTimeout) object:nil];
-			[self performSelector:@selector(dumpTimeout) withObject:nil afterDelay:.5];
-		}
-		else if([lastRequest hasPrefix:@"CU"]){
-			if([partsByComma count] == 2){
-				NSString* theUnits = [partsByComma objectAtIndex:1];
-				if([theUnits hasPrefix:@"CF"])[self setCountUnits:0];
-				else if([theUnits hasPrefix:@"/L"])[self setCountUnits:1];
-				else if([theUnits hasPrefix:@"TC"])[self setCountUnits:2];
-			}
-		}
-		else if([lastRequest hasPrefix:@"ST"]){
-			NSArray* partsBySpaces = [theResponse componentsSeparatedByString:@" "];
-			if([partsBySpaces count]==2){
-				NSString* st = [partsBySpaces objectAtIndex:1];
-				[self setCycleDuration:[st intValue]];
-			}
-		}
-		else if([lastRequest hasPrefix:@"TU"]){
-			NSArray* partsBySpaces = [theResponse componentsSeparatedByString:@" "];
-			if([partsBySpaces count]==2){
-				NSString* st = [partsBySpaces objectAtIndex:1];
-				[self setTempUnits:[st intValue]];
-			}
-		}
-        else if([theResponse rangeOfString:@"COUNTING STOPPED" options:NSCaseInsensitiveSearch].location != NSNotFound){
-			[self setRunning:NO];
-		}
-		else if([theResponse rangeOfString:@"COUNTING STARTED" options:NSCaseInsensitiveSearch].location != NSNotFound){
-			[self setRunning:YES];
-			[self checkCycle];
-		}
-        else if([theResponse rangeOfString:@"CANNOT CHANGE WHILE" options:NSCaseInsensitiveSearch].location != NSNotFound){
-			if(probing){
-				probing = NO;
-			}
-			[self setRunning:YES];
-		}
-		else if([theResponse hasPrefix:@"CLEAR"]){
-			NSLog(@"Met637(%d) Clearing ALL data.",[self uniqueIdNumber]);
-		}	
-	}
-	[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(timeout) object:nil];
-}
-
-- (void) checkDate
-{
-    if([measurementDate length]){
-        NSDateFormatter* dateFormat = [[[NSDateFormatter alloc] init] autorelease];
-        [dateFormat setDateFormat:@"dd-MMM-yyyy HH:mm:ss"];
-        NSDate* measuredDate = [dateFormat dateFromString:measurementDate];
-        NSTimeInterval delta = fabs((double)[measuredDate timeIntervalSinceNow]);
-        if(delta > kMet637AllowedTimeDelta){
-            NSLog(@"Stopping %@ to sync the time (time error: %.0f secs)\n",[self fullID],delta);
-            [self stopCycle];
-            int i;
-            for(i=0;i<5/kMet637DelayTime;i++){
-                [self enqueueCmd:@"++Delay"];
-            }
-            [self setDate];
-            if(countingMode == kMet637Auto){
-                NSLog(@"Restarting %@ after sync'ing the date\n",[self fullID]);
-                [self startCycle:YES];
-            }
-            
         }
     }
-}
-
-- (void) clearDelay
-{
-	delay = NO;
-	[self processOneCommandFromQueue];
-}
-
-- (void) dumpTimeout
-{
-	[self setDumpInProgress:NO];
-	[self setDumpCount:0];
-	[self setLastRequest:nil];			 //clear the last request
-	[self processOneCommandFromQueue];	 //do the next command in the queue
-
-	NSLog(@"Met637 (%d): Data printout finished\n",[self uniqueIdNumber]);
+    else if(funcCode == kPMS31FC_WriteSingleReg){
+        // Write single register echo — check if it was a start/stop command
+        int regAddr = (bytes[2] << 8) | bytes[3];
+        int regValue = (bytes[4] << 8) | bytes[5];
+        if(regAddr == kPMS31Reg_StartStop){
+            if(regValue == 0x0001){
+                NSLog(@"PMS31(%d): Detection started\n",[self uniqueIdNumber]);
+            }
+            else if(regValue == 0x0000){
+                NSLog(@"PMS31(%d): Detection stopped\n",[self uniqueIdNumber]);
+            }
+        }
+    }
+    else if(funcCode == kPMS31FC_WriteMultiReg){
+        // Write multiple registers response — time sync confirmation
+        NSLog(@"PMS31(%d): Time sync confirmed\n",[self uniqueIdNumber]);
+    }
+    
+    [self setLastRequest:nil];
+    [self processOneCommandFromQueue];
 }
 
 - (void) processOneCommandFromQueue
 {
-    if(delay)return;
-	
-	NSString* aCmd = [self nextCmd];
-	if(aCmd){
-		if([aCmd isEqualToString:@"++Delay"]){
-			delay = YES;
-			[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(clearDelay) object:nil];
-			[self performSelector:@selector(clearDelay) withObject:nil afterDelay:kMet637DelayTime];
-		}
-		else {
-			[self startTimeout:3];
-			[self setLastRequest:aCmd];
-			[serialPort writeString:aCmd];
-		}
-	}
+    NSData* cmdData = [self nextCmd];
+    if(cmdData){
+        [self startTimeout:kPMS31CmdTimeout];
+        [self setLastRequest:cmdData];
+        [serialPort writeDataInBackground:cmdData];
+    }
 }
 
 @end

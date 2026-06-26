@@ -659,7 +659,7 @@
                                         <imageView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Blx-ca-Tvz">
                                             <rect key="frame" x="11" y="350" width="74" height="69"/>
                                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                            <imageCell key="cell" controlSize="small" refusesFirstResponder="YES" alignment="left" imageScaling="proportionallyUpOrDown" image="Bt610" id="QhO-nq-Ye4"/>
+                                            <imageCell key="cell" controlSize="small" refusesFirstResponder="YES" alignment="left" imageScaling="proportionallyUpOrDown" image="PMS_31" id="QhO-nq-Ye4"/>
                                         </imageView>
                                         <box fixedFrame="YES" borderType="line" title="Process Parameters (Device Units)" translatesAutoresizingMaskIntoConstraints="NO" id="ROL-Hd-WOg">
                                             <rect key="frame" x="77" y="144" width="328" height="285"/>
@@ -965,7 +965,6 @@
         </customObject>
     </objects>
     <resources>
-        <image name="Bt610" width="40" height="56"/>
         <image name="Locked" width="33" height="36"/>
         <image name="PMS_31" width="70" height="100"/>
         <image name="Unlocked" width="33" height="36"/>
