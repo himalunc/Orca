@@ -304,13 +304,13 @@
     if(!aNote){
         int i;
         for(i=0;i<kPMS31NumChannels;i++){
-            [[countAlarmLimitMatrix cellWithTag:i] setIntValue:[model countAlarmLimit:i]];
+            [[countAlarmLimitMatrix cellWithTag:i] setStringValue:[NSString stringWithFormat:@"%d",(int)[model countAlarmLimit:i]]];
         }
     }
     else {
         int chan = [[[aNote userInfo] objectForKey:@"Channel"] intValue];
         if(chan<kPMS31NumChannels){
-            [[countAlarmLimitMatrix cellWithTag:chan] setIntValue:[model countAlarmLimit:chan]];
+            [[countAlarmLimitMatrix cellWithTag:chan] setStringValue:[NSString stringWithFormat:@"%d",(int)[model countAlarmLimit:chan]]];
         }
     }
 }
@@ -320,13 +320,13 @@
     if(!aNote){
         int i;
         for(i=0;i<kPMS31NumChannels;i++){
-            [[maxCountsMatrix cellWithTag:i] setFloatValue:[model maxCounts:i]];
+            [[maxCountsMatrix cellWithTag:i] setStringValue:[NSString stringWithFormat:@"%d",(int)[model maxCounts:i]]];
         }
     }
     else {
         int chan = [[[aNote userInfo] objectForKey:@"Channel"] intValue];
         if(chan<kPMS31NumChannels){
-            [[maxCountsMatrix cellWithTag:chan] setFloatValue:[model maxCounts:chan]];
+            [[maxCountsMatrix cellWithTag:chan] setStringValue:[NSString stringWithFormat:@"%d",(int)[model maxCounts:chan]]];
         }
     }
 }
@@ -540,12 +540,14 @@
 
 - (IBAction) countAlarmLimitAction:(id)sender
 {
-    [model setIndex:(int)[[sender selectedCell] tag] countAlarmLimit:[[sender selectedCell] floatValue]];    
+    NSString* raw = [[[sender selectedCell] stringValue] stringByReplacingOccurrencesOfString:@" " withString:@""];
+    [model setIndex:(int)[[sender selectedCell] tag] countAlarmLimit:(float)[raw intValue]];    
 }
 
 - (IBAction) maxCountsAction:(id)sender
 {
-    [model setIndex:(int)[[sender selectedCell] tag] maxCounts:[[sender selectedCell] floatValue]];
+    NSString* raw = [[[sender selectedCell] stringValue] stringByReplacingOccurrencesOfString:@" " withString:@""];
+    [model setIndex:(int)[[sender selectedCell] tag] maxCounts:(float)[raw intValue]];
 }
 
 - (IBAction) startCycleAction:(id)sender

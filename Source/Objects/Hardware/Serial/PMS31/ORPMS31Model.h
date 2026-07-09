@@ -24,8 +24,8 @@
 @class ORAlarm;
 
 // PMS31 Timing Constants
-#define kPMS31CmdTimeout          3
-#define kPMS31PollInterval        2
+#define kPMS31CmdTimeout          5
+#define kPMS31DefaultPollInterval 5
 #define kPMS31NumChannels         7
 
 // Modbus Defaults

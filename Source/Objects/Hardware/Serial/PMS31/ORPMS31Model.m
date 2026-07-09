@@ -53,6 +53,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) pollOnce;
 - (void) startPolling;
 - (void) stopPolling;
+- (void) startCycleTimer;
+- (void) cancelCycleTimer;
+- (void) cycleComplete;
 - (void) startDataArrivalTimeout;
 - (void) cancelDataArrivalTimeout;
 - (void) doCycleKick;
@@ -67,7 +70,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [[self undoManager] disableUndoRegistration];
     slaveAddress  = kPMS31DefaultSlaveAddr;
     baudRate      = kPMS31DefaultBaudRate;
-    pollInterval  = kPMS31PollInterval;
+    pollInterval  = kPMS31DefaultPollInterval;
     cycleDuration = 60;
     int i;
     for(i=0;i<kPMS31NumChannels;i++){
@@ -75,6 +78,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [self setIndex:i countAlarmLimit:800];
     }
     [[self undoManager] enableUndoRegistration];
+    [self startPolling];
     return self;
 }
 
@@ -460,7 +464,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     
     if(slaveAddress == 0) slaveAddress = kPMS31DefaultSlaveAddr;
     if(baudRate == 0)     baudRate = kPMS31DefaultBaudRate;
-    if(pollInterval == 0) pollInterval = kPMS31PollInterval;
+    if(pollInterval == 0) pollInterval = kPMS31DefaultPollInterval;
 
     int i; 
     for(i=0;i<kPMS31NumChannels;i++){
@@ -634,27 +638,32 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 {
     if((![self running] || force) && [serialPort isOpen]){
         [self setCycleNumber:1];
+        int i;
+        for(i=0;i<kPMS31NumChannels;i++){
+            [self setCount:i value:0];
+        }
         NSDate* now = [NSDate date];
         [self setCycleStarted:now];
-        [self syncDeviceTime];
         [self startDetection];
         [self setRunning:YES];
         [self startPolling];
+        [self startCycleTimer];
         [self startDataArrivalTimeout];
-        NSLog(@"PMS31(%d) Starting particle counter in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
+        NSLog(@"PMS31(%d) Starting particle counter in %@ mode (cycle duration: %d sec)\n",[self uniqueIdNumber], [self countingModeString], cycleDuration);
     }
 }
 
 - (void) stopCycle
 {
+    //[self stopPolling];
+    [self cancelCycleTimer];
+    [self cancelDataArrivalTimeout];
     if([serialPort isOpen]){
-        [self stopPolling];
         [self stopDetection];
-        [self cancelDataArrivalTimeout];
-        [self setCycleNumber:0];
-        [self setRunning:NO];
-        NSLog(@"PMS31(%d) Stopping particle counter. Was in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
     }
+    [self setCycleNumber:0];
+    [self setRunning:NO];
+    NSLog(@"PMS31(%d) Stopping particle counter. Was in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
 }
 
 
@@ -763,6 +772,17 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     return [self isValid] && [serialPort isOpen];
 }
 
+- (void) recoverFromTimeout
+{
+    // Base class cleared the queue and set lastRequest=nil.
+    // If we're still running, restart polling so we keep trying.
+    if(running && [serialPort isOpen]){
+        NSLog(@"PMS31(%d) Recovering from timeout, restarting polling.\n",[self uniqueIdNumber]);
+        [dataBuffer setLength:0]; // clear stale data
+        [self startPolling];
+    }
+}
+
 @end
 
 @implementation ORPMS31Model (private)
@@ -807,6 +827,45 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
 }
 
+- (void) startCycleTimer
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(cycleComplete) object:nil];
+    [self performSelector:@selector(cycleComplete) withObject:nil afterDelay:cycleDuration];
+}
+
+- (void) cancelCycleTimer
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(cycleComplete) object:nil];
+}
+
+- (void) cycleComplete
+{
+    NSLog(@"PMS31(%d) Cycle %d complete.\n",[self uniqueIdNumber], [self cycleNumber]);
+    
+    // Post the data record with current counts [add influxDB here]
+    [self postCouchDBRecord];
+    
+    if(countingMode == kPMS31Auto){
+        // Auto mode: increment cycle, clear counts, restart timers
+        int theCount = [self cycleNumber];
+        [self setCycleNumber:theCount+1];
+        int i;
+        for(i=0;i<kPMS31NumChannels;i++){
+            [self setCount:i value:0];
+        }
+        [self setCycleStarted:[NSDate date]];
+        [self startCycleTimer];
+        [self startPolling];           // ensure polling is active
+        [self startDataArrivalTimeout]; // reset safety net
+        NSLog(@"PMS31(%d) Starting cycle %d\n",[self uniqueIdNumber],[self cycleNumber]);
+    }
+    else {
+        // Manual/Single mode: stop after one cycle
+        NSLog(@"PMS31(%d) Single cycle finished.\n",[self uniqueIdNumber]);
+        [self stopCycle];
+    }
+}
+
 - (void) startDataArrivalTimeout
 {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(doCycleKick) object:nil];
@@ -847,6 +906,10 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) processModbusResponse:(NSData*)responseData
 {
+    // We got a response, cancel the pending timeout and clear error state
+    [self cancelTimeout];
+    [self setTimeoutCount:0];
+    
     unsigned char* bytes = (unsigned char*)[responseData bytes];
     int len = (int)[responseData length];
     
@@ -896,19 +959,10 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             NSString* dateStr = [dateFormatter stringFromDate:[NSDate date]];
             [self setMeasurementDate:dateStr];
             
+            // Reset the data arrival safety timeout since we got good data
             [self setMissedCycleCount:0];
             [self cancelDataArrivalTimeout];
-            [self postCouchDBRecord];
-            
-            if(countingMode == kPMS31Manual){
-                [self stopCycle];
-            }
-            else {
-                [self startDataArrivalTimeout];
-                int theCount = [self cycleNumber];
-                [self setCycleNumber:theCount+1];
-                [self setCycleStarted:[NSDate date]];
-            }
+            [self startDataArrivalTimeout];
         }
     }
     else if(funcCode == kPMS31FC_WriteSingleReg){
