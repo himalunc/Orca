@@ -43,7 +43,8 @@ NSString* ORPMS31ModelMissedCountChanged      = @"ORPMS31ModelMissedCountChanged
 NSString* ORPMS31ModelSlaveAddressChanged     = @"ORPMS31ModelSlaveAddressChanged";
 NSString* ORPMS31ModelBaudRateChanged         = @"ORPMS31ModelBaudRateChanged";
 NSString* ORPMS31ModelPollIntervalChanged     = @"ORPMS31ModelPollIntervalChanged";
-
+NSString* ORPMS31ModelDeviceCountModeChanged  = @"ORPMS31ModelDeviceCountModeChanged";
+NSString* ORPMS31ModelDeviceSampleUnitChanged = @"ORPMS31ModelDeviceSampleUnitChanged";
 NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 @interface ORPMS31Model (private)
@@ -223,6 +224,34 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     pollInterval = aPollInterval;
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelPollIntervalChanged object:self];
 }
+
+- (int) deviceCountMode
+{
+    return deviceCountMode;
+}
+- (int) deviceSampleUnit
+{
+    return deviceSampleUnit;
+}
+
+- (void) setDeviceCountMode:(int)aMode
+{
+    if(aMode < 0) aMode = 0;
+    if(aMode > 1) aMode = 1;
+    [[[self undoManager] prepareWithInvocationTarget:self] setDeviceCountMode:deviceCountMode];
+    deviceCountMode = aMode;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelDeviceCountModeChanged object:self];
+}
+
+- (void) setDeviceSampleUnit:(int)aUnit
+{
+    if (aUnit<0) aUnit = 0;
+    if (aUnit>3) aUnit = 3;
+    [[[self undoManager] prepareWithInvocationTarget:self] setDeviceSampleUnit:deviceSampleUnit];
+    deviceSampleUnit = aUnit;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelDeviceSampleUnitChanged object:self];
+}
+
 
 - (int) missedCycleCount
 {
@@ -461,7 +490,8 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [self setSlaveAddress:  [decoder decodeIntForKey:   @"slaveAddress"]];
     [self setBaudRate:      [decoder decodeIntForKey:   @"baudRate"]];
     [self setPollInterval:  [decoder decodeIntForKey:   @"pollInterval"]];
-    
+    [self setDeviceCountMode:[decoder decodeIntForKey: @"deviceCountMode"]];
+    [self setDeviceSampleUnit:[decoder decodeIntForKey: @"deviceSampleUnit"]];
     if(slaveAddress == 0) slaveAddress = kPMS31DefaultSlaveAddr;
     if(baudRate == 0)     baudRate = kPMS31DefaultBaudRate;
     if(pollInterval == 0) pollInterval = kPMS31DefaultPollInterval;
@@ -487,8 +517,10 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [encoder encodeBool:    wasRunning      forKey: @"wasRunning"];
     [encoder encodeInteger: slaveAddress    forKey: @"slaveAddress"];
     [encoder encodeInteger: baudRate        forKey: @"baudRate"];
-    [encoder encodeInteger: pollInterval    forKey: @"pollInterval"];
-    int i; 
+    [encoder encodeInteger: pollInterval      forKey: @"pollInterval"];
+    [encoder encodeInteger: deviceCountMode  forKey: @"deviceCountMode"];
+    [encoder encodeInteger: deviceSampleUnit  forKey: @"deviceSampleUnit"];
+    int i;
     for(i=0;i<kPMS31NumChannels;i++){
         [encoder encodeFloat:   countAlarmLimit[i] forKey: [NSString stringWithFormat:@"countAlarmLimit%d",i]];
         [encoder encodeFloat:   maxCounts[i]       forKey: [NSString stringWithFormat:@"maxCounts%d",i]];
@@ -627,6 +659,24 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
 }
 
+- (void) sendDeviceCountMode
+{
+    if([serialPort isOpen]){
+        // Write to register 0x0E: 0x00=Sum(cumulative), 0x01=Diff(differential)
+        NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_CountMode value:deviceCountMode];
+        [self addCmdToQueue:frame];
+        NSLog(@"PMS31(%d): Sending device count mode = %@ (0x%02X)\n",
+              [self uniqueIdNumber], deviceCountMode == kPMS31CountModeDiff ? @"Diff" : @"Sum", deviceCountMode);
+    }
+}
+
+- (void) sendDeviceUnitMode
+{
+    if([serialPort isOpen]){
+        NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_SampleUnit value:deviceSampleUnit];
+        [self addCmdToQueue:frame];
+    }
+}
 #pragma mark ***Polling and Cycles
 
 - (void) startCycle
@@ -644,6 +694,8 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         }
         NSDate* now = [NSDate date];
         [self setCycleStarted:now];
+        [self sendDeviceCountMode];
+        [self sendDeviceUnitMode];
         [self startDetection];
         [self setRunning:YES];
         [self startPolling];

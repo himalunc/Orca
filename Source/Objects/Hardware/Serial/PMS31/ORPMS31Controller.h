@@ -33,6 +33,8 @@
     IBOutlet NSPopUpButton*     baudRatePU;
     IBOutlet NSTextField*       pollIntervalField;
     IBOutlet NSPopUpButton*     countingModePU;
+    IBOutlet NSPopUpButton*     deviceCountModePU;
+    IBOutlet NSPopUpButton*     deviceSampleUnitModePU;
     
     IBOutlet NSMatrix*          countMatrix;
     IBOutlet NSTextField*       measurementDateField;
@@ -81,6 +83,8 @@
 - (void) slaveAddressChanged:(NSNotification*)aNote;
 - (void) baudRateChanged:(NSNotification*)aNote;
 - (void) pollIntervalChanged:(NSNotification*)aNote;
+- (void) deviceCountModeChanged:(NSNotification*)aNote;
+- (void) deviceSampleUnitModeChanged:(NSNotification *)aNote;
 - (void) countAlarmLimitChanged:(NSNotification*)aNote;
 - (void) maxCountsChanged:(NSNotification*)aNote;
 - (void) cycleNumberChanged:(NSNotification*)aNote;
@@ -104,6 +108,8 @@
 - (IBAction) slaveAddressAction:(id)sender;
 - (IBAction) baudRateAction:(id)sender;
 - (IBAction) pollIntervalAction:(id)sender;
+- (IBAction) deviceCountModeAction:(id)sender;
+- (IBAction) deviceSampleUnitModeAction:(id)sender;
 - (IBAction) countAlarmLimitAction:(id)sender;
 - (IBAction) maxCountsAction:(id)sender;
 - (IBAction) lockAction:(id) sender;

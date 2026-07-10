@@ -242,6 +242,16 @@
                          name : ORPMS31ModelPollIntervalChanged
                         object: model];
 
+    [notifyCenter addObserver : self
+                     selector : @selector(deviceCountModeChanged:)
+                         name : ORPMS31ModelDeviceCountModeChanged
+                        object: model];
+    
+    [notifyCenter addObserver : self
+                     selector : @selector(deviceSampleUnitModeChanged:)
+                         name : ORPMS31ModelDeviceSampleUnitChanged
+                        object: model];
+    
     [serialPortController registerNotificationObservers];
 }
 
@@ -266,6 +276,8 @@
     [self slaveAddressChanged:nil];
     [self baudRateChanged:nil];
     [self pollIntervalChanged:nil];
+    [self deviceCountModeChanged:nil];
+    [self deviceCountModeChanged:nil];
     [serialPortController updateWindow];
 }
 
@@ -299,6 +311,15 @@
     [pollIntervalField setIntegerValue: [model pollInterval]];
 }
 
+- (void) deviceCountModeChanged:(NSNotification*)aNote
+{
+    [deviceCountModePU selectItemAtIndex: [model deviceCountMode]];
+}
+
+- (void) deviceSampleUnitModeChanged:(NSNotification *)aNote
+{
+    [deviceSampleUnitModePU selectItemAtIndex:[model deviceSampleUnit]];
+}
 - (void) countAlarmLimitChanged:(NSNotification*)aNote
 {
     if(!aNote){
@@ -375,6 +396,7 @@
 - (void) cycleStartedChanged:(NSNotification*)aNote
 {    
     NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
     NSString* startDateString = [dateFormatter stringFromDate:[model cycleStarted]];
     [dateFormatter release];
     if(startDateString && [model running]) [cycleStartedField setStringValue:startDateString];
@@ -384,6 +406,7 @@
 - (void) cycleWillEndChanged:(NSNotification*)aNote
 {
     NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
     NSString* endDateString = [dateFormatter stringFromDate:[model cycleWillEnd]];
     [dateFormatter release];
     NSString* s;
@@ -469,6 +492,8 @@
     [slaveAddressField setEnabled:![model running] && !locked];
     [baudRatePU setEnabled:![model running] && !locked];
     [pollIntervalField setEnabled:![model running] && !locked];
+    [deviceCountModePU setEnabled:![model running] && !locked];
+    [deviceSampleUnitModePU setEnabled:![model running] && !locked];
 }
 
 - (void)tabView:(NSTabView *)aTabView didSelectTabViewItem:(NSTabViewItem *)tabViewItem
@@ -533,6 +558,15 @@
     [model setPollInterval:[sender intValue]];
 }
 
+- (IBAction) deviceCountModeAction:(id)sender
+{
+    [model setDeviceCountMode:(int)[sender indexOfSelectedItem]];
+}
+
+- (IBAction) deviceSampleUnitModeAction:(id)sender
+{
+    [model setDeviceSampleUnit:(int)[sender indexOfSelectedItem]];
+}
 - (IBAction) countingModeAction:(id)sender
 {
     [model setCountingMode:(int)[sender indexOfSelectedItem]];

@@ -45,10 +45,19 @@
 #define kPMS31Reg_CountsCount     0x000E  // 14 registers (7 channels x 2)
 #define kPMS31Reg_TimeStart       0x0008
 #define kPMS31Reg_TimeCount       0x0006  // 6 registers (yr,mo,dy,hr,mn,sc)
-
-// Counting Modes
+#define kPMS31Reg_CountMode       0x000E  // 0x00=Sum(cumulative), 0x01=Diff(differential)
+#define kPMS31Reg_SampleUnit      0x000F
+// ORCA Cycle Modes
 #define kPMS31Manual  0
 #define kPMS31Auto    1
+//add the sampling unit mode
+#define kPMS31SampleUnitTC 0
+#define kPMS31SampleUnitCF 1
+#define kPMS31SampleUnitL  2
+#define kPMS31SampleUnitM3 0
+// Device Count Modes
+#define kPMS31CountModeSum   0
+#define kPMS31CountModeDiff  1
 
 @interface ORPMS31Model : ORSerialPortWithQueueModel <ORAdcProcessing>
 {
@@ -71,6 +80,8 @@
         int             slaveAddress;
         int             baudRate;
         int             pollInterval;
+        int             deviceCountMode;
+        int             deviceSampleUnit;
         BOOL            polling;
         ORAlarm*        missingCyclesAlarm;
         BOOL            sentStartOnce;
@@ -92,6 +103,10 @@
 - (void) setBaudRate:(int)aBaudRate;
 - (int) pollInterval;
 - (void) setPollInterval:(int)aPollInterval;
+- (int) deviceCountMode;
+- (void) setDeviceCountMode:(int)aMode;
+- (int) deviceSampleUnit;
+- (void) setDeviceSampleUnit:(int)aUnit;
 - (BOOL) isLog;
 - (void) setIsLog:(BOOL)aIsLog;
 - (int) location;
@@ -131,6 +146,8 @@
 - (void) startDetection;
 - (void) stopDetection;
 - (void) syncDeviceTime;
+- (void) sendDeviceCountMode;
+- (void) sendDeviceUnitMode;
 
 #pragma mark ***Modbus Helpers
 - (unsigned int) modbusCalcCRC:(unsigned char*)data length:(int)length;
@@ -173,5 +190,7 @@ extern NSString* ORPMS31ModelMissedCountChanged;
 extern NSString* ORPMS31ModelSlaveAddressChanged;
 extern NSString* ORPMS31ModelBaudRateChanged;
 extern NSString* ORPMS31ModelPollIntervalChanged;
+extern NSString* ORPMS31ModelDeviceCountModeChanged;
+extern NSString* ORPMS31ModelDeviceSampleUnitChanged;
 
 extern NSString* ORPMS31Lock;
