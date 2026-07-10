@@ -36,6 +36,7 @@ NSString* ORPMS31ModelCycleWillEndChanged     = @"ORPMS31ModelCycleWillEndChange
 NSString* ORPMS31ModelCycleStartedChanged     = @"ORPMS31ModelCycleStartedChanged";
 NSString* ORPMS31ModelRunningChanged          = @"ORPMS31ModelRunningChanged";
 NSString* ORPMS31ModelCycleDurationChanged    = @"ORPMS31ModelCycleDurationChanged";
+NSString* ORPMS31ModelHoldDurationChanged    = @"ORPMS31ModelHoldDurationChanged";
 NSString* ORPMS31ModelCountingModeChanged     = @"ORPMS31ModelCountingModeChanged";
 NSString* ORPMS31ModelCountChanged            = @"ORPMS31ModelCountChanged";
 NSString* ORPMS31ModelMeasurementDateChanged  = @"ORPMS31ModelMeasurementDateChanged";
@@ -73,6 +74,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     baudRate      = kPMS31DefaultBaudRate;
     pollInterval  = kPMS31DefaultPollInterval;
     cycleDuration = 60;
+    holdDuration = 20;
     int i;
     for(i=0;i<kPMS31NumChannels;i++){
         [self setIndex:i maxCounts:1000];
@@ -405,6 +407,11 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     return cycleDuration;
 }
 
+- (int) holdDuration
+{
+    return holdDuration;
+}
+
 - (void) setCycleDuration:(int)aCycleDuration
 {
     if(aCycleDuration < 10) aCycleDuration = 10;
@@ -413,6 +420,16 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     cycleDuration = aCycleDuration;
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCycleDurationChanged object:self];
 }
+
+- (void) setHoldDuration:(int)aHoldDuration
+{
+    if(aHoldDuration < 10) aHoldDuration = 10;
+    else if(aHoldDuration > 9999) aHoldDuration = 9999;
+    [[[self undoManager] prepareWithInvocationTarget:self] setHoldDuration:holdDuration];
+    holdDuration = aHoldDuration;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelHoldDurationChanged object:self];
+}
+
 
 - (int) countingMode
 {
@@ -486,6 +503,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [self setLocation:      [decoder decodeIntForKey:   @"location"]];
     wasRunning =            [decoder decodeBoolForKey:  @"wasRunning"];
     [self setCycleDuration: [decoder decodeIntForKey:   @"cycleDuration"]];
+    [self setHoldDuration: [decoder decodeIntForKey:   @"holdDuration"]];
     [self setCountingMode:  [decoder decodeIntForKey:   @"countingMode"]];
     [self setSlaveAddress:  [decoder decodeIntForKey:   @"slaveAddress"]];
     [self setBaudRate:      [decoder decodeIntForKey:   @"baudRate"]];
@@ -513,6 +531,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [encoder encodeBool:    isLog           forKey:@"isLog"];
     [encoder encodeInteger: location        forKey: @"location"];
     [encoder encodeInteger: cycleDuration   forKey: @"cycleDuration"];
+    [encoder encodeInteger: holdDuration   forKey: @"holdDuration"];
     [encoder encodeInteger: countingMode    forKey: @"countingMode"];
     [encoder encodeBool:    wasRunning      forKey: @"wasRunning"];
     [encoder encodeInteger: slaveAddress    forKey: @"slaveAddress"];

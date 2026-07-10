@@ -41,6 +41,7 @@
 
     IBOutlet NSButton*          lockButton;
     IBOutlet NSTextField*       cycleDurationField;
+    IBOutlet NSTextField*       holdDurationField;
     IBOutlet NSButton*          startCycleButton;
     IBOutlet NSButton*          stopCycleButton;
     IBOutlet NSTextField*       cycleNumberField;
@@ -92,6 +93,7 @@
 - (void) cycleStartedChanged:(NSNotification*)aNote;
 - (void) runningChanged:(NSNotification*)aNote;
 - (void) cycleDurationChanged:(NSNotification*)aNote;
+- (void) holdDurationChanged:(NSNotification*)aNote;
 - (void) countingModeChanged:(NSNotification*)aNote;
 - (void) countChanged:(NSNotification*)aNote;
 - (void) measurementDateChanged:(NSNotification*)aNote;
@@ -114,6 +116,7 @@
 - (IBAction) maxCountsAction:(id)sender;
 - (IBAction) lockAction:(id) sender;
 - (IBAction) cycleDurationAction:(id)sender;
+- (IBAction) holdDurationAction:(id)sender;
 - (IBAction) startCycleAction:(id)sender;
 - (IBAction) stopCycleAction:(id)sender;
 - (IBAction) countingModeAction:(id)sender;

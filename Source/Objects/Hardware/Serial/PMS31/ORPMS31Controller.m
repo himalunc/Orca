@@ -171,6 +171,10 @@
                      selector : @selector(cycleDurationChanged:)
                          name : ORPMS31ModelCycleDurationChanged
                         object: model];
+    [notifyCenter addObserver : self
+                     selector : @selector(holdDurationChanged:)
+                         name : ORPMS31ModelHoldDurationChanged
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(runningChanged:)
@@ -263,6 +267,7 @@
     [self countChanged:nil];
     [self countingModeChanged:nil];
     [self cycleDurationChanged:nil];
+    [self holdDurationChanged:nil];
     [self runningChanged:nil];
     [self cycleStartedChanged:nil];
     [self cycleWillEndChanged:nil];
@@ -438,6 +443,11 @@
     [cycleDurationField setIntValue: [model cycleDuration]];
 }
 
+- (void) holdDurationChanged:(NSNotification *)aNote
+{
+    [holdDurationField setIntValue:[model holdDuration]];
+}
+
 - (void) countingModeChanged:(NSNotification*)aNote
 {
     [countingModePU selectItemAtIndex: [model countingMode]];
@@ -488,6 +498,7 @@
         [stopCycleButton setEnabled:NO];
     }
     [cycleDurationField setEnabled:![model running] && !locked];
+    [holdDurationField setEnabled:![model running] && !locked];
     [countingModePU setEnabled:![model running] && !locked];
     [slaveAddressField setEnabled:![model running] && !locked];
     [baudRatePU setEnabled:![model running] && !locked];
@@ -601,6 +612,11 @@
 - (IBAction) cycleDurationAction:(id)sender
 {
     [model setCycleDuration:[sender intValue]];    
+}
+
+- (IBAction)holdDurationAction:(id)sender
+{
+    [model setHoldDuration:[sender intValue]];
 }
 
 - (IBAction) lockAction:(id) sender

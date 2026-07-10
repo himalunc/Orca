@@ -70,6 +70,7 @@
         float           countAlarmLimit[kPMS31NumChannels];
         int             countingMode;
         int             cycleDuration;
+        int             holdDuration;
         BOOL            running;
         NSDate*         cycleStarted;
         NSDate*         cycleWillEnd;
@@ -121,7 +122,9 @@
 - (BOOL) running;
 - (void) setRunning:(BOOL)aRunning;
 - (int) cycleDuration;
+- (int) holdDuration;
 - (void) setCycleDuration:(int)aCycleDuration;
+- (void) setHoldDuration:(int)aHoldDuration;
 - (int) countingMode;
 - (void) setCountingMode:(int)aCountingMode;
 - (void) setCount:(int)index value:(int)aValue;
@@ -183,6 +186,7 @@ extern NSString* ORPMS31ModelCycleWillEndChanged;
 extern NSString* ORPMS31ModelCycleStartedChanged;
 extern NSString* ORPMS31ModelRunningChanged;
 extern NSString* ORPMS31ModelCycleDurationChanged;
+extern NSString* ORPMS31ModelHoldDurationChanged;
 extern NSString* ORPMS31ModelCountingModeChanged;
 extern NSString* ORPMS31ModelCountChanged;
 extern NSString* ORPMS31ModelMeasurementDateChanged;
