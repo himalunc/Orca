@@ -46,6 +46,7 @@ NSString* ORPMS31ModelBaudRateChanged         = @"ORPMS31ModelBaudRateChanged";
 NSString* ORPMS31ModelPollIntervalChanged     = @"ORPMS31ModelPollIntervalChanged";
 NSString* ORPMS31ModelDeviceCountModeChanged  = @"ORPMS31ModelDeviceCountModeChanged";
 NSString* ORPMS31ModelDeviceSampleUnitChanged = @"ORPMS31ModelDeviceSampleUnitChanged";
+NSString* ORPMS31ModelSerialNumberChanged    = @"ORPMS31ModelSerialNumberChanged";
 NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 @interface ORPMS31Model (private)
@@ -58,6 +59,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) startCycleTimer;
 - (void) cancelCycleTimer;
 - (void) cycleComplete;
+- (void) startNextCycle;
 - (void) startDataArrivalTimeout;
 - (void) cancelDataArrivalTimeout;
 - (void) doCycleKick;
@@ -99,6 +101,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [timeRates[i] release];
     }
     
+    [serialNumber release];
     [missingCyclesAlarm release];
     [missingCyclesAlarm clearAlarm];
 
@@ -168,7 +171,24 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
                 neededLength = 3 + byteCount + 2;
             }
         }
-        else if(funcCode == kPMS31FC_WriteSingleReg){
+        else if(funcCode == kPMS31FC_ReadHoldingReg){
+        // Parse holding register read response
+        // Response: [addr][0x03][byteCount][data...][crc_lo][crc_hi]
+        int byteCount = bytes[2];
+        if(byteCount == kPMS31Reg_SerialCount * 2){ // 12 bytes = 6 registers
+            // Each register holds one serial number digit/character
+            NSMutableString* sn = [NSMutableString string];
+            int i;
+            for(i = 0; i < kPMS31Reg_SerialCount; i++){
+                int offset = 3 + i * 2;
+                unsigned int regVal = (bytes[offset] << 8) | bytes[offset+1];
+                [sn appendFormat:@"%u", regVal];
+            }
+            [self setSerialNumber:sn];
+            NSLog(@"PMS31(%d): Serial number = %@\n", [self uniqueIdNumber], sn);
+        }
+    }
+    else if(funcCode == kPMS31FC_WriteSingleReg){
             // Echo response: addr(1) + fc(1) + reg(2) + value(2) + crc(2) = 8
             neededLength = 8;
         }
@@ -287,6 +307,20 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
 }
 
+- (NSString*) serialNumber
+{
+    if(!serialNumber) return @"--";
+    return serialNumber;
+}
+
+- (void) setSerialNumber:(NSString*)aSerialNumber
+{
+    [aSerialNumber retain];
+    [serialNumber release];
+    serialNumber = aSerialNumber;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelSerialNumberChanged object:self];
+}
+
 - (BOOL) isLog
 {
     return isLog;
@@ -384,7 +418,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [cycleStarted release];
     cycleStarted = aCycleStarted;
 
-    int totalTime = [self cycleDuration];
+    int totalTime = [self cycleDuration] + [self holdDuration];
     NSDate* endTime = [aCycleStarted dateByAddingTimeInterval:totalTime];
     [self setCycleWillEnd:endTime]; 
     
@@ -490,7 +524,8 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) firstActionAfterOpeningPort
 {
-    // Read particle counts once to verify communication
+    // Read serial number and particle counts to verify communication
+    [self readSerialNumber];
     [self readParticleCounts];
 }
 
@@ -579,6 +614,25 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     unsigned int crc = [self modbusCalcCRC:bytes length:6];
     bytes[6] = crc & 0xFF;        // CRC low byte first
     bytes[7] = (crc >> 8) & 0xFF; // CRC high byte
+    
+    return frame;
+}
+
+- (NSData*) buildReadHoldingRegistersFrame:(int)startReg count:(int)regCount
+{
+    NSMutableData* frame = [NSMutableData dataWithLength:8];
+    unsigned char* bytes = (unsigned char*)[frame mutableBytes];
+    
+    bytes[0] = (unsigned char)slaveAddress;
+    bytes[1] = kPMS31FC_ReadHoldingReg;
+    bytes[2] = (startReg >> 8) & 0xFF;
+    bytes[3] = startReg & 0xFF;
+    bytes[4] = (regCount >> 8) & 0xFF;
+    bytes[5] = regCount & 0xFF;
+    
+    unsigned int crc = [self modbusCalcCRC:bytes length:6];
+    bytes[6] = crc & 0xFF;
+    bytes[7] = (crc >> 8) & 0xFF;
     
     return frame;
 }
@@ -696,6 +750,34 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [self addCmdToQueue:frame];
     }
 }
+
+- (void) sendCycleDuration
+{
+    if([serialPort isOpen]){
+        NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_SampleTime value:cycleDuration];
+        [self addCmdToQueue:frame];
+        NSLog(@"PMS31(%d): Sending cycle duration = %d sec to device register 0x10\n",
+              [self uniqueIdNumber], cycleDuration);
+    }
+}
+
+- (void) sendHoldDuration
+{
+    if([serialPort isOpen]){
+        NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_HoldTime value:holdDuration];
+        [self addCmdToQueue:frame];
+        NSLog(@"PMS31(%d): Sending hold duration = %d sec to device register 0x11\n",
+              [self uniqueIdNumber], holdDuration);
+    }
+}
+
+- (void) readSerialNumber
+{
+    if([serialPort isOpen]){
+        NSData* frame = [self buildReadHoldingRegistersFrame:kPMS31Reg_SerialStart count:kPMS31Reg_SerialCount];
+        [self addCmdToQueue:frame];
+    }
+}
 #pragma mark ***Polling and Cycles
 
 - (void) startCycle
@@ -715,6 +797,8 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [self setCycleStarted:now];
         [self sendDeviceCountMode];
         [self sendDeviceUnitMode];
+        [self sendCycleDuration];
+        [self sendHoldDuration];
         [self startDetection];
         [self setRunning:YES];
         [self startPolling];
@@ -726,9 +810,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) stopCycle
 {
-    //[self stopPolling];
     [self cancelCycleTimer];
     [self cancelDataArrivalTimeout];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(startNextCycle) object:nil];
     if([serialPort isOpen]){
         [self stopDetection];
     }
@@ -901,7 +985,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) startCycleTimer
 {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(cycleComplete) object:nil];
-    [self performSelector:@selector(cycleComplete) withObject:nil afterDelay:cycleDuration];
+    // Total cycle period = counting time + device hold time
+    int totalCycleTime = cycleDuration + holdDuration;
+    [self performSelector:@selector(cycleComplete) withObject:nil afterDelay:totalCycleTime];
 }
 
 - (void) cancelCycleTimer
@@ -917,18 +1003,10 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [self postCouchDBRecord];
     
     if(countingMode == kPMS31Auto){
-        // Auto mode: increment cycle, clear counts, restart timers
-        int theCount = [self cycleNumber];
-        [self setCycleNumber:theCount+1];
-        int i;
-        for(i=0;i<kPMS31NumChannels;i++){
-            [self setCount:i value:0];
-        }
-        [self setCycleStarted:[NSDate date]];
-        [self startCycleTimer];
-        [self startPolling];           // ensure polling is active
-        [self startDataArrivalTimeout]; // reset safety net
-        NSLog(@"PMS31(%d) Starting cycle %d\n",[self uniqueIdNumber],[self cycleNumber]);
+        // Device handles the hold delay via register 0x11.
+        // ORCA's cycle timer already accounts for cycleDuration + holdDuration,
+        // so we restart the next cycle immediately here.
+        [self startNextCycle];
     }
     else {
         // Manual/Single mode: stop after one cycle
@@ -937,10 +1015,27 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
 }
 
+- (void) startNextCycle
+{
+    // Auto mode: increment cycle, clear counts, restart timers
+    int theCount = [self cycleNumber];
+    [self setCycleNumber:theCount+1];
+    int i;
+    for(i=0;i<kPMS31NumChannels;i++){
+        [self setCount:i value:0];
+    }
+    [self setCycleStarted:[NSDate date]];
+    [self startDetection];
+    [self startCycleTimer];
+    [self startPolling];           // ensure polling is active
+    [self startDataArrivalTimeout]; // reset safety net
+    NSLog(@"PMS31(%d) Starting cycle %d\n",[self uniqueIdNumber],[self cycleNumber]);
+}
+
 - (void) startDataArrivalTimeout
 {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(doCycleKick) object:nil];
-    [self performSelector:@selector(doCycleKick)  withObject:nil afterDelay:(cycleDuration+120)];
+    [self performSelector:@selector(doCycleKick)  withObject:nil afterDelay:(cycleDuration + holdDuration + 120)];
 }
 
 - (void) cancelDataArrivalTimeout
@@ -959,6 +1054,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             [self setCount:i value:0];
         }
         [self setIsValid:NO];
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(startNextCycle) object:nil];
         [self stopCycle];
         [self startCycle:YES];
     }

@@ -47,6 +47,12 @@
 #define kPMS31Reg_TimeCount       0x0006  // 6 registers (yr,mo,dy,hr,mn,sc)
 #define kPMS31Reg_CountMode       0x000E  // 0x00=Sum(cumulative), 0x01=Diff(differential)
 #define kPMS31Reg_SampleUnit      0x000F
+#define kPMS31Reg_SampleTime      0x0010  // Sample/cycle duration time
+#define kPMS31Reg_HoldTime        0x0011  // Hold/delay time between sampling cycles
+
+// Serial Number Registers (6 registers, each holds one character/value)
+#define kPMS31Reg_SerialStart     0x0020  // Serial Number 0
+#define kPMS31Reg_SerialCount     6       // 6 registers (0x20-0x25)
 // ORCA Cycle Modes
 #define kPMS31Manual  0
 #define kPMS31Auto    1
@@ -89,6 +95,7 @@
         BOOL            sentStopOnce;
         int             missedCycleCount;
         int             expectedResponseLength;
+        NSString*       serialNumber;
 }
 
 
@@ -138,6 +145,8 @@
 - (void) setIndex:(int)index maxCounts:(float)aMaxCounts;
 - (void) setMissedCycleCount:(int)aValue;
 - (int) missedCycleCount;
+- (NSString*) serialNumber;
+- (void) setSerialNumber:(NSString*)aSerialNumber;
 
 #pragma mark ***Polling
 - (void) startCycle:(BOOL)force;
@@ -151,10 +160,14 @@
 - (void) syncDeviceTime;
 - (void) sendDeviceCountMode;
 - (void) sendDeviceUnitMode;
+- (void) sendCycleDuration;
+- (void) sendHoldDuration;
+- (void) readSerialNumber;
 
 #pragma mark ***Modbus Helpers
 - (unsigned int) modbusCalcCRC:(unsigned char*)data length:(int)length;
 - (NSData*) buildReadInputRegistersFrame:(int)startReg count:(int)regCount;
+- (NSData*) buildReadHoldingRegistersFrame:(int)startReg count:(int)regCount;
 - (NSData*) buildWriteSingleRegisterFrame:(int)reg value:(int)value;
 - (NSData*) buildWriteMultipleRegistersFrame:(int)startReg values:(int*)values count:(int)regCount;
 
@@ -196,5 +209,6 @@ extern NSString* ORPMS31ModelBaudRateChanged;
 extern NSString* ORPMS31ModelPollIntervalChanged;
 extern NSString* ORPMS31ModelDeviceCountModeChanged;
 extern NSString* ORPMS31ModelDeviceSampleUnitChanged;
+extern NSString* ORPMS31ModelSerialNumberChanged;
 
 extern NSString* ORPMS31Lock;

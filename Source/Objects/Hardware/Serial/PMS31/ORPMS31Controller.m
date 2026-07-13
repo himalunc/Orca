@@ -255,6 +255,11 @@
                      selector : @selector(deviceSampleUnitModeChanged:)
                          name : ORPMS31ModelDeviceSampleUnitChanged
                         object: model];
+
+    [notifyCenter addObserver : self
+                     selector : @selector(serialNumberChanged:)
+                         name : ORPMS31ModelSerialNumberChanged
+                        object: model];
     
     [serialPortController registerNotificationObservers];
 }
@@ -283,12 +288,18 @@
     [self pollIntervalChanged:nil];
     [self deviceCountModeChanged:nil];
     [self deviceCountModeChanged:nil];
+    [self serialNumberChanged:nil];
     [serialPortController updateWindow];
 }
 
 - (void) timedOutChanged:(NSNotification*)aNote
 {
     [timedOutField setStringValue: [model timeoutCount]!=0 ? @"Last Command Timed Out":@""];
+}
+
+- (void) serialNumberChanged:(NSNotification*)aNote
+{
+    [serialNumberField setStringValue:[model serialNumber]];
 }
 
 - (void) isLogChanged:(NSNotification*)aNote

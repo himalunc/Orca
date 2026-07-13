@@ -48,6 +48,7 @@
     IBOutlet NSTextField*       cycleWillEndField;
     IBOutlet NSTextField*       cycleStartedField;
     IBOutlet NSTextField*       runningField;
+    IBOutlet NSTextField*       serialNumberField;
     
     IBOutlet ORCompositeTimeLineView*   plotter0;
     IBOutlet NSMatrix* countAlarmLimitMatrix;
@@ -95,6 +96,7 @@
 - (void) cycleDurationChanged:(NSNotification*)aNote;
 - (void) holdDurationChanged:(NSNotification*)aNote;
 - (void) countingModeChanged:(NSNotification*)aNote;
+- (void) serialNumberChanged:(NSNotification*)aNote;
 - (void) countChanged:(NSNotification*)aNote;
 - (void) measurementDateChanged:(NSNotification*)aNote;
 - (void) updateButtons;
