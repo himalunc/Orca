@@ -60,6 +60,8 @@
     IBOutlet NSTextField*       cycleWillEnd2Field;
     IBOutlet NSTextField*       running2Field;
     
+    IBOutlet NSButton*          syncButton;
+    IBOutlet NSButton*          writeSettingsButton;
     IBOutlet ORSerialPortController* serialPortController;
 
     NSSize                      basicOpsSize;
@@ -97,6 +99,7 @@
 - (void) holdDurationChanged:(NSNotification*)aNote;
 - (void) countingModeChanged:(NSNotification*)aNote;
 - (void) serialNumberChanged:(NSNotification*)aNote;
+- (void) portStateChanged:(NSNotification*)aNote;
 - (void) countChanged:(NSNotification*)aNote;
 - (void) measurementDateChanged:(NSNotification*)aNote;
 - (void) updateButtons;
@@ -122,6 +125,9 @@
 - (IBAction) startCycleAction:(id)sender;
 - (IBAction) stopCycleAction:(id)sender;
 - (IBAction) countingModeAction:(id)sender;
+- (IBAction) probePMS31Hardware:(id)sender;
+- (IBAction) syncSettingsAction:(id)sender;
+- (IBAction) writeSettingsAction:(id)sender;
 
 #pragma mark ***Data Source
 - (int) numberPointsInPlot:(id)aPlotter;

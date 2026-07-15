@@ -56,6 +56,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) pollOnce;
 - (void) startPolling;
 - (void) stopPolling;
+- (void) startStatusPolling;
+- (void) stopStatusPolling;
+- (void) statusPollOnce;
 - (void) startCycleTimer;
 - (void) cancelCycleTimer;
 - (void) cycleComplete;
@@ -64,6 +67,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) cancelDataArrivalTimeout;
 - (void) doCycleKick;
 - (void) postCouchDBRecord;
+- (void) startHoldTimer;
+- (void) cancelHoldTimer;
+- (void) holdModeAction;
 @end
 
 @implementation ORPMS31Model
@@ -110,6 +116,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) sleep
 {
+    [self stopStatusPolling];
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
     [super sleep];
 }
@@ -131,7 +138,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (NSString*) helpURL
 {
-    return @"RS232/PMS31.html";
+    return @"RS485/PMS31.html";
 }
 
 #pragma mark ***Data Received - Modbus Binary
@@ -171,24 +178,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
                 neededLength = 3 + byteCount + 2;
             }
         }
-        else if(funcCode == kPMS31FC_ReadHoldingReg){
-        // Parse holding register read response
-        // Response: [addr][0x03][byteCount][data...][crc_lo][crc_hi]
-        int byteCount = bytes[2];
-        if(byteCount == kPMS31Reg_SerialCount * 2){ // 12 bytes = 6 registers
-            // Each register holds one serial number digit/character
-            NSMutableString* sn = [NSMutableString string];
-            int i;
-            for(i = 0; i < kPMS31Reg_SerialCount; i++){
-                int offset = 3 + i * 2;
-                unsigned int regVal = (bytes[offset] << 8) | bytes[offset+1];
-                [sn appendFormat:@"%u", regVal];
-            }
-            [self setSerialNumber:sn];
-            NSLog(@"PMS31(%d): Serial number = %@\n", [self uniqueIdNumber], sn);
-        }
-    }
-    else if(funcCode == kPMS31FC_WriteSingleReg){
+        else if(funcCode == kPMS31FC_WriteSingleReg){
             // Echo response: addr(1) + fc(1) + reg(2) + value(2) + crc(2) = 8
             neededLength = 8;
         }
@@ -524,9 +514,12 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) firstActionAfterOpeningPort
 {
-    // Read serial number and particle counts to verify communication
+    // Read serial number, device status, and particle counts to verify communication
     [self readSerialNumber];
+    [self readDeviceStatus];
     [self readParticleCounts];
+    // Start background status polling to detect external start/stop
+    [self startStatusPolling];
 }
 
 #pragma mark ***Archival
@@ -778,6 +771,74 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [self addCmdToQueue:frame];
     }
 }
+
+- (void) readDeviceSettings
+{
+    if([serialPort isOpen]){
+        // Read 4 contiguous registers: CountMode(0x0E), SampleUnit(0x0F), SampleTime(0x10), HoldTime(0x11)
+        NSData* frame = [self buildReadHoldingRegistersFrame:kPMS31Reg_SettingsStart count:kPMS31Reg_SettingsCount];
+        [self addCmdToQueue:frame];
+    }
+}
+
+- (void) writeSettingsToDevice
+{
+    if([serialPort isOpen]){
+        NSLog(@"PMS31(%d): Loading ORCA settings to device...\n", [self uniqueIdNumber]);
+        [self sendDeviceCountMode];
+        [self sendDeviceUnitMode];
+        [self sendCycleDuration];
+        [self sendHoldDuration];
+        NSLog(@"PMS31(%d): Settings sent to device.\n", [self uniqueIdNumber]);
+    }
+}
+
+- (void) sendPMS31ToInfluxDB
+{
+    @autoreleasepool {
+        InFluxDB = [[[(ORAppDelegate*)[NSApp delegate] document] findObjectWithFullID:@"ORInFluxDBModel,1"] retain];
+        if(InFluxDB == nil){
+            NSLog(@"PMS31(%d): Error: Unable to find the InfluxDB model.\n", [self uniqueIdNumber]);
+            return;
+        }
+        double currentTimeStamp = [[NSDate date] timeIntervalSince1970];
+        ORInFluxDBMeasurement* measurement = [ORInFluxDBMeasurement measurementForBucket:@"ENAP_SC_UNC" org:[InFluxDB org]];
+
+        [measurement start:@"PMS31_ParticleCounts"];
+        [measurement addTag:@"unit" withString:[NSString stringWithFormat:@"%u", [self uniqueIdNumber]]];
+        [measurement addTag:@"mode" withString:[self countingModeString]];
+
+        NSArray* channelNames = @[@"0.3um", @"0.5um", @"0.7um", @"1.0um", @"2.5um", @"5.0um", @"10um"];
+        int i;
+        for(i = 0; i < kPMS31NumChannels; i++){
+            [measurement addField:[channelNames objectAtIndex:i] withLong:(long)[self count:i]];
+        }
+
+        [measurement setTimeStamp:currentTimeStamp];
+        [InFluxDB executeDBCmd:measurement];
+        [InFluxDB release];
+
+        NSLog(@"PMS31(%d): Sent particle counts to InfluxDB\n", [self uniqueIdNumber]);
+    }
+}
+
+- (void) readDeviceStatus
+{
+    if([serialPort isOpen]){
+        // Read register 0x01 (Start/Stop): 0x0001=running, 0x0000=stopped
+        NSData* frame = [self buildReadHoldingRegistersFrame:kPMS31Reg_StartStop count:1];
+        [self addCmdToQueue:frame];
+    }
+}
+
+- (void) probeDevice
+{
+    if([serialPort isOpen]){
+        NSLog(@"PMS31(%d): Probing device settings...\n", [self uniqueIdNumber]);
+        [self readSerialNumber];
+        [self readDeviceSettings];
+    }
+}
 #pragma mark ***Polling and Cycles
 
 - (void) startCycle
@@ -799,10 +860,12 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [self sendDeviceUnitMode];
         [self sendCycleDuration];
         [self sendHoldDuration];
+        [self readDeviceSettings];
         [self startDetection];
         [self setRunning:YES];
         [self startPolling];
         [self startCycleTimer];
+        [self startHoldTimer];
         [self startDataArrivalTimeout];
         NSLog(@"PMS31(%d) Starting particle counter in %@ mode (cycle duration: %d sec)\n",[self uniqueIdNumber], [self countingModeString], cycleDuration);
     }
@@ -811,6 +874,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) stopCycle
 {
     [self cancelCycleTimer];
+    [self cancelHoldTimer];
     [self cancelDataArrivalTimeout];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(startNextCycle) object:nil];
     if([serialPort isOpen]){
@@ -973,10 +1037,31 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(pollOnce) object:nil];
 }
 
+- (void) startStatusPolling
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(statusPollOnce) object:nil];
+    [self performSelector:@selector(statusPollOnce) withObject:nil afterDelay:10];
+}
+
+- (void) stopStatusPolling
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(statusPollOnce) object:nil];
+}
+
+- (void) statusPollOnce
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(statusPollOnce) object:nil];
+    if([serialPort isOpen]){
+        [self readDeviceStatus];
+        [self performSelector:@selector(statusPollOnce) withObject:nil afterDelay:10];
+    }
+}
+
 - (void) pollOnce
 {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(pollOnce) object:nil];
     if(polling && [serialPort isOpen]){
+        [self readDeviceStatus];
         [self readParticleCounts];
         [self performSelector:@selector(pollOnce) withObject:nil afterDelay:pollInterval];
     }
@@ -1009,8 +1094,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [self startNextCycle];
     }
     else {
-        // Manual/Single mode: stop after one cycle
+        // Manual/Single mode: send to InfluxDB after cycle, then stop
         NSLog(@"PMS31(%d) Single cycle finished.\n",[self uniqueIdNumber]);
+        [self sendPMS31ToInfluxDB];
         [self stopCycle];
     }
 }
@@ -1027,6 +1113,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [self setCycleStarted:[NSDate date]];
     [self startDetection];
     [self startCycleTimer];
+    [self startHoldTimer];
     [self startPolling];           // ensure polling is active
     [self startDataArrivalTimeout]; // reset safety net
     NSLog(@"PMS31(%d) Starting cycle %d\n",[self uniqueIdNumber],[self cycleNumber]);
@@ -1060,9 +1147,30 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
 }
 
+- (void) startHoldTimer
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(holdModeAction) object:nil];
+    [self performSelector:@selector(holdModeAction) withObject:nil afterDelay:cycleDuration];
+}
+
+- (void) cancelHoldTimer
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(holdModeAction) object:nil];
+}
+
+- (void) holdModeAction
+{
+    // Fires at the start of hold period (after cycleDuration, before holdDuration ends)
+    // Poll for final counts and send to InfluxDB in repeating mode
+    if(countingMode == kPMS31Auto && [serialPort isOpen]){
+        [self readParticleCounts];
+        [self sendPMS31ToInfluxDB];
+    }
+}
+
 - (void) addCmdToQueue:(NSData*)aCmd
 {
-    if([serialPort isOpen]){ 
+    if([serialPort isOpen]){
         [self enqueueCmd:aCmd];
         if(!lastRequest){
             [self processOneCommandFromQueue];
@@ -1130,6 +1238,70 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             [self setMissedCycleCount:0];
             [self cancelDataArrivalTimeout];
             [self startDataArrivalTimeout];
+        }
+    }
+    else if(funcCode == kPMS31FC_ReadHoldingReg){
+        // Parse holding register read response
+        // Response: [addr][0x03][byteCount][data...][crc_lo][crc_hi]
+        int byteCount = bytes[2];
+        if(byteCount == kPMS31Reg_SerialCount * 2){ // 12 bytes = 6 registers → serial number
+            // Each register holds 2 ASCII characters (high byte, low byte)
+            NSMutableString* sn = [NSMutableString string];
+            int i;
+            for(i = 0; i < kPMS31Reg_SerialCount; i++){
+                int offset = 3 + i * 2;
+                unsigned char hi = bytes[offset];
+                unsigned char lo = bytes[offset+1];
+                if(hi) [sn appendFormat:@"%c", hi];
+                if(lo) [sn appendFormat:@"%c", lo];
+            }
+            [self setSerialNumber:sn];
+            NSLog(@"PMS31(%d): Serial number = %@\n", [self uniqueIdNumber], sn);
+        }
+        else if(byteCount == kPMS31Reg_SettingsCount * 2){ // 8 bytes = 4 registers → device settings
+            // Registers: CountMode(0x0E), SampleUnit(0x0F), SampleTime(0x10), HoldTime(0x11)
+            int readCountMode  = (bytes[3] << 8) | bytes[4];
+            int readSampleUnit = (bytes[5] << 8) | bytes[6];
+            int readSampleTime = (bytes[7] << 8) | bytes[8];
+            int readHoldTime   = (bytes[9] << 8) | bytes[10];
+            
+            // Apply the read-back settings to the model
+            [self setDeviceCountMode:readCountMode];
+            [self setDeviceSampleUnit:readSampleUnit];
+            [self setCycleDuration:readSampleTime];
+            [self setHoldDuration:readHoldTime];
+            
+            NSLog(@"PMS31(%d): Device Settings Loaded:\n", [self uniqueIdNumber]);
+            NSLog(@"  Count Mode   = %d (%@)\n", readCountMode,
+                  readCountMode == kPMS31CountModeSum ? @"Sum/Cumulative" : @"Diff/Differential");
+            NSLog(@"  Sample Unit  = %d\n", readSampleUnit);
+            NSLog(@"  Sample Time  = %d sec\n", readSampleTime);
+            NSLog(@"  Hold Time    = %d sec\n", readHoldTime);
+        }
+        else if(byteCount == 2){ // 2 bytes = 1 register → device status (StartStop register)
+            int regVal = (bytes[3] << 8) | bytes[4];
+            BOOL deviceRunning = (regVal == 0x0001);
+            if(deviceRunning != running){
+                [self setRunning:deviceRunning];
+                if(deviceRunning){
+                    NSLog(@"PMS31(%d): Device started externally — syncing ORCA state\n", [self uniqueIdNumber]);
+                    if(cycleNumber == 0) [self setCycleNumber:1];
+                    [self setCycleStarted:[NSDate date]];
+                    [self startCycleTimer];
+                    [self startDataArrivalTimeout];
+                }
+                else {
+                    NSLog(@"PMS31(%d): Device stopped externally — syncing ORCA state\n", [self uniqueIdNumber]);
+                    [self cancelCycleTimer];
+                    [self cancelDataArrivalTimeout];
+                    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(startNextCycle) object:nil];
+                    [self setCycleNumber:0];
+                }
+            }
+        }
+        else {
+            NSLog(@"PMS31(%d): Holding register response with %d bytes (unhandled)\n",
+                  [self uniqueIdNumber], byteCount);
         }
     }
     else if(funcCode == kPMS31FC_WriteSingleReg){

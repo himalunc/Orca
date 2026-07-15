@@ -19,6 +19,7 @@
 #pragma mark ***Imported Files
 #import "ORAdcProcessing.h"
 #import "ORSerialPortWithQueueModel.h"
+#import "ORInFluxDBModel.h"
 
 @class ORTimeRate;
 @class ORAlarm;
@@ -49,6 +50,10 @@
 #define kPMS31Reg_SampleUnit      0x000F
 #define kPMS31Reg_SampleTime      0x0010  // Sample/cycle duration time
 #define kPMS31Reg_HoldTime        0x0011  // Hold/delay time between sampling cycles
+
+// Device Settings block (4 contiguous registers: 0x0E-0x11)
+#define kPMS31Reg_SettingsStart   0x000E  // First settings register (CountMode)
+#define kPMS31Reg_SettingsCount   4       // CountMode, SampleUnit, SampleTime, HoldTime
 
 // Serial Number Registers (6 registers, each holds one character/value)
 #define kPMS31Reg_SerialStart     0x0020  // Serial Number 0
@@ -96,6 +101,7 @@
         int             missedCycleCount;
         int             expectedResponseLength;
         NSString*       serialNumber;
+        ORInFluxDBModel* InFluxDB;
 }
 
 
@@ -163,6 +169,11 @@
 - (void) sendCycleDuration;
 - (void) sendHoldDuration;
 - (void) readSerialNumber;
+- (void) readDeviceSettings;
+- (void) writeSettingsToDevice;
+- (void) readDeviceStatus;
+- (void) probeDevice;
+- (void) sendPMS31ToInfluxDB;
 
 #pragma mark ***Modbus Helpers
 - (unsigned int) modbusCalcCRC:(unsigned char*)data length:(int)length;

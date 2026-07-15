@@ -31,10 +31,12 @@
                 <outlet property="slaveAddressField" destination="B3l-U5-twl" id="wwU-JD-0W1"/>
                 <outlet property="startCycleButton" destination="dl7-nT-dYO" id="uUQ-C9-PIY"/>
                 <outlet property="stopCycleButton" destination="ecY-1R-vzG" id="M3h-u1-tZr"/>
+                <outlet property="syncButton" destination="OcF-6E-WkL" id="RMk-N7-D2l"/>
                 <outlet property="tabView" destination="bw1-hc-3Bt" id="O3A-XV-Gw3"/>
                 <outlet property="timedOutField" destination="BHe-WZ-K57" id="4gD-Wa-X0M"/>
                 <outlet property="totalView" destination="6" id="2645"/>
                 <outlet property="window" destination="5" id="38"/>
+                <outlet property="writeSettingsButton" destination="wSt-Ld-Btn" id="wSt-Cn-001"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
@@ -86,7 +88,7 @@
                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                 <subviews>
                                                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="ukM-D4-5Y6">
-                                                        <rect key="frame" x="92" y="218" width="42" height="22"/>
+                                                        <rect key="frame" x="91" y="216" width="42" height="22"/>
                                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                                         <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" title="--" drawsBackground="YES" id="5W6-iM-iha">
                                                             <font key="font" metaFont="smallSystem"/>
@@ -104,7 +106,7 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <button toolTip="Poll the Hardware now" imageHugsTitle="YES" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dl7-nT-dYO">
-                                                        <rect key="frame" x="1" y="270" width="104" height="28"/>
+                                                        <rect key="frame" x="1" y="270" width="67" height="28"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <buttonCell key="cell" type="push" title="Start" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" inset="2" id="VhO-uO-MQJ">
                                                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -115,7 +117,7 @@
                                                         </connections>
                                                     </button>
                                                     <button toolTip="Poll the Hardware now" imageHugsTitle="YES" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="ecY-1R-vzG">
-                                                        <rect key="frame" x="1" y="246" width="103" height="28"/>
+                                                        <rect key="frame" x="1" y="242" width="67" height="28"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <buttonCell key="cell" type="push" title="Stop" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" inset="2" id="Brv-Nc-RSq">
                                                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -282,6 +284,28 @@
                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                         </textFieldCell>
                                                     </textField>
+                                                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="wSt-Ld-Btn">
+                                                        <rect key="frame" x="96" y="271" width="104" height="24"/>
+                                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                                        <buttonCell key="cell" type="push" title="Load Settings" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="wSt-Bc-001">
+                                                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                                                            <font key="font" metaFont="system" size="11"/>
+                                                        </buttonCell>
+                                                        <connections>
+                                                            <action selector="writeSettingsAction:" target="-2" id="wSt-Ac-001"/>
+                                                        </connections>
+                                                    </button>
+                                                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="OcF-6E-WkL">
+                                                        <rect key="frame" x="96" y="244" width="104" height="24"/>
+                                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                                        <buttonCell key="cell" type="push" title="Sync Settings" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="vMi-yc-4kf">
+                                                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                                                            <font key="font" metaFont="system" size="11"/>
+                                                        </buttonCell>
+                                                        <connections>
+                                                            <action selector="syncSettingsAction:" target="-2" id="4aO-33-PaZ"/>
+                                                        </connections>
+                                                    </button>
                                                 </subviews>
                                             </view>
                                         </box>
@@ -294,7 +318,7 @@
                                             </view>
                                         </box>
                                         <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="zwb-xU-Gep">
-                                            <rect key="frame" x="90" y="0.0" width="35" height="22"/>
+                                            <rect key="frame" x="109" y="0.0" width="35" height="17"/>
                                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                             <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" title="5" drawsBackground="YES" id="ueg-6r-oEv">
                                                 <font key="font" metaFont="smallSystem"/>
@@ -306,7 +330,7 @@
                                             </connections>
                                         </textField>
                                         <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="FIy-bR-Yt2">
-                                            <rect key="frame" x="24" y="3" width="53" height="14"/>
+                                            <rect key="frame" x="44" y="1" width="53" height="14"/>
                                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                             <textFieldCell key="cell" controlSize="small" lineBreakMode="clipping" title="Poll Time" id="OTF-lc-JNB">
                                                 <font key="font" metaFont="smallSystem"/>
@@ -315,7 +339,7 @@
                                             </textFieldCell>
                                         </textField>
                                         <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="GSj-AP-QK8">
-                                            <rect key="frame" x="131" y="3" width="33" height="17"/>
+                                            <rect key="frame" x="152" y="0.0" width="33" height="17"/>
                                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                             <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="left" title="secs" id="8xV-d1-vxt">
                                                 <font key="font" metaFont="smallSystem"/>
@@ -553,6 +577,9 @@
                                                 <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                                                 <font key="font" metaFont="smallSystem"/>
                                             </buttonCell>
+                                            <connections>
+                                                <action selector="probePMS31Hardware:" target="-2" id="ujy-Jp-P6Z"/>
+                                            </connections>
                                         </button>
                                         <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="s4B-z4-Pou">
                                             <rect key="frame" x="85" y="366" width="96" height="22"/>

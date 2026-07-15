@@ -25,6 +25,7 @@
 #import "ORTimeAxis.h"
 #import "ORTimeRate.h"
 #import "ORSerialPortController.h"
+#import "ORSerialPort.h"
 
 @implementation ORPMS31Controller
 
@@ -260,6 +261,11 @@
                      selector : @selector(serialNumberChanged:)
                          name : ORPMS31ModelSerialNumberChanged
                         object: model];
+
+    [notifyCenter addObserver : self
+                     selector : @selector(portStateChanged:)
+                         name : ORSerialPortModelPortStateChanged
+                        object: model];
     
     [serialPortController registerNotificationObservers];
 }
@@ -300,6 +306,11 @@
 - (void) serialNumberChanged:(NSNotification*)aNote
 {
     [serialNumberField setStringValue:[model serialNumber]];
+}
+
+- (void) portStateChanged:(NSNotification*)aNote
+{
+    [self updateButtons];
 }
 
 - (void) isLogChanged:(NSNotification*)aNote
@@ -494,28 +505,33 @@
 
 - (void) updateButtons
 {
-    BOOL locked = [gSecurity isLocked:ORPMS31Lock];
+    BOOL locked    = [gSecurity isLocked:ORPMS31Lock];
+    BOOL portOpen  = [[model serialPort] isOpen];
+    BOOL isRunning = [model running];
     
     [serialPortController updateButtons:locked];
 
     [lockButton setState: locked];
     
-    if(!locked){
-        [startCycleButton setEnabled:![model running]];
-        [stopCycleButton setEnabled:[model running]];
+    if(!locked && portOpen){
+        [startCycleButton setEnabled:!isRunning];
+        [stopCycleButton setEnabled:isRunning];
     }
     else {
         [startCycleButton setEnabled:NO];
         [stopCycleButton setEnabled:NO];
     }
-    [cycleDurationField setEnabled:![model running] && !locked];
-    [holdDurationField setEnabled:![model running] && !locked];
-    [countingModePU setEnabled:![model running] && !locked];
-    [slaveAddressField setEnabled:![model running] && !locked];
-    [baudRatePU setEnabled:![model running] && !locked];
-    [pollIntervalField setEnabled:![model running] && !locked];
-    [deviceCountModePU setEnabled:![model running] && !locked];
-    [deviceSampleUnitModePU setEnabled:![model running] && !locked];
+    BOOL canEdit = !isRunning && !locked;
+    [cycleDurationField setEnabled:canEdit];
+    [holdDurationField setEnabled:canEdit];
+    [countingModePU setEnabled:canEdit];
+    [slaveAddressField setEnabled:canEdit && !portOpen];
+    [baudRatePU setEnabled:canEdit && !portOpen];
+    [pollIntervalField setEnabled:canEdit];
+    [deviceCountModePU setEnabled:canEdit];
+    [deviceSampleUnitModePU setEnabled:canEdit];
+    [syncButton setEnabled:portOpen && !locked && !isRunning];
+    [writeSettingsButton setEnabled:portOpen && !locked && !isRunning];
 }
 
 - (void)tabView:(NSTabView *)aTabView didSelectTabViewItem:(NSTabViewItem *)tabViewItem
@@ -593,7 +609,20 @@
 {
     [model setCountingMode:(int)[sender indexOfSelectedItem]];
 }
+- (IBAction) probePMS31Hardware:(id)sender
+{
+    [model probeDevice];
+}
+- (IBAction) syncSettingsAction:(id)sender
+{
+    [model readDeviceSettings];
+    [model readSerialNumber];
+}
 
+- (IBAction) writeSettingsAction:(id)sender
+{
+    [model writeSettingsToDevice];
+}
 - (IBAction) countAlarmLimitAction:(id)sender
 {
     NSString* raw = [[[sender selectedCell] stringValue] stringByReplacingOccurrencesOfString:@" " withString:@""];
