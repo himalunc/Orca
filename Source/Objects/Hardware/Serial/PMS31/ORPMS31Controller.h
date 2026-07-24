@@ -28,6 +28,7 @@
     IBOutlet NSTextField*       lockDocField;
     IBOutlet NSTextField*       timedOutField;
     IBOutlet NSButton*          isLogCB;
+    IBOutlet NSButton*          verboseCB;
 
     IBOutlet NSTextField*       slaveAddressField;
     IBOutlet NSPopUpButton*     baudRatePU;
@@ -83,6 +84,7 @@
 
 #pragma mark ***Interface Management
 - (void) timedOutChanged:(NSNotification*)aNote;
+- (void) verboseChanged:(NSNotification*)aNote;
 - (void) isLogChanged:(NSNotification*)aNote;
 - (void) slaveAddressChanged:(NSNotification*)aNote;
 - (void) baudRateChanged:(NSNotification*)aNote;
@@ -111,6 +113,7 @@
 - (void) windowDidResize:(NSNotification *)aNote;
 
 #pragma mark ***Actions
+- (IBAction) verboseAction:(id)sender;
 - (IBAction) isLogAction:(id)sender;
 - (IBAction) slaveAddressAction:(id)sender;
 - (IBAction) baudRateAction:(id)sender;

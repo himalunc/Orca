@@ -17,7 +17,7 @@
                 <outlet property="cycleNumberField" destination="ukM-D4-5Y6" id="GvD-7b-fDk"/>
                 <outlet property="cycleStartedField" destination="rv2-aq-vto" id="xgn-jC-VdK"/>
                 <outlet property="deviceCountModePU" destination="XmR-wl-Erl" id="3YO-Ke-AsY"/>
-                <outlet property="deviceSampleUnitModePU" destination="wNM-2i-z3A" id="mBI-lw-KYV"/>
+                <outlet property="deviceSampleUnitModePU" destination="9jR-eU-tph" id="HbN-0C-v8L"/>
                 <outlet property="holdDurationField" destination="jUy-N4-Kef" id="qPn-Gp-8MX"/>
                 <outlet property="isLogCB" destination="XT5-gI-bvD" id="yRS-aO-qdG"/>
                 <outlet property="lockButton" destination="82y-Rl-jt9" id="XKX-u1-RVV"/>
@@ -35,6 +35,7 @@
                 <outlet property="tabView" destination="bw1-hc-3Bt" id="O3A-XV-Gw3"/>
                 <outlet property="timedOutField" destination="BHe-WZ-K57" id="4gD-Wa-X0M"/>
                 <outlet property="totalView" destination="6" id="2645"/>
+                <outlet property="verboseCB" destination="fS3-0b-sIb" id="hty-Am-wuf"/>
                 <outlet property="window" destination="5" id="38"/>
                 <outlet property="writeSettingsButton" destination="wSt-Ld-Btn" id="wSt-Cn-001"/>
             </connections>
@@ -250,31 +251,6 @@
                                                             <action selector="countingModeAction:" target="-2" id="0SN-oj-9PY"/>
                                                         </connections>
                                                     </popUpButton>
-                                                    <popUpButton verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="wNM-2i-z3A" userLabel="Sampling mode item">
-                                                        <rect key="frame" x="115" y="14" width="87" height="20"/>
-                                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                        <popUpButtonCell key="cell" type="push" title="TC" bezelStyle="rounded" alignment="center" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" selectedItem="d9v-TY-TX7" id="kAU-Ps-bhe" userLabel="unit">
-                                                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
-                                                            <font key="font" metaFont="smallSystem"/>
-                                                            <menu key="menu" id="RN4-TO-dlm">
-                                                                <items>
-                                                                    <menuItem title="TC" state="on" keyEquivalent="" id="d9v-TY-TX7" userLabel="TC">
-                                                                        <modifierMask key="keyEquivalentModifierMask"/>
-                                                                    </menuItem>
-                                                                    <menuItem title="CF" id="H4B-Xo-5Da" userLabel="CF"/>
-                                                                    <menuItem title="L" state="on" keyEquivalent="" id="bAs-03-Qp2" userLabel="L">
-                                                                        <modifierMask key="keyEquivalentModifierMask"/>
-                                                                    </menuItem>
-                                                                    <menuItem title="M3" state="on" keyEquivalent="" id="Fut-44-Yoh" userLabel="M3">
-                                                                        <modifierMask key="keyEquivalentModifierMask"/>
-                                                                    </menuItem>
-                                                                </items>
-                                                            </menu>
-                                                        </popUpButtonCell>
-                                                        <connections>
-                                                            <action selector="deviceSampleUnitModeAction:" target="-2" id="Ccz-Zm-Nvv"/>
-                                                        </connections>
-                                                    </popUpButton>
                                                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="MOb-8e-UfL">
                                                         <rect key="frame" x="139" y="115" width="33" height="17"/>
                                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
@@ -289,7 +265,7 @@
                                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                                         <buttonCell key="cell" type="push" title="Load Settings" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="wSt-Bc-001">
                                                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                                                            <font key="font" metaFont="system" size="11"/>
+                                                            <font key="font" metaFont="smallSystem"/>
                                                         </buttonCell>
                                                         <connections>
                                                             <action selector="writeSettingsAction:" target="-2" id="wSt-Ac-001"/>
@@ -300,17 +276,38 @@
                                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                                         <buttonCell key="cell" type="push" title="Sync Settings" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="vMi-yc-4kf">
                                                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                                                            <font key="font" metaFont="system" size="11"/>
+                                                            <font key="font" metaFont="smallSystem"/>
                                                         </buttonCell>
                                                         <connections>
                                                             <action selector="syncSettingsAction:" target="-2" id="4aO-33-PaZ"/>
                                                         </connections>
                                                     </button>
+                                                    <popUpButton verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="9jR-eU-tph" userLabel="SamplingUnit">
+                                                        <rect key="frame" x="113" y="13" width="87" height="20"/>
+                                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                                        <popUpButtonCell key="cell" type="push" title="TC" bezelStyle="rounded" alignment="center" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" selectedItem="Taa-B8-cCk" id="X6k-6M-d6x" userLabel="unit">
+                                                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                                                            <font key="font" metaFont="smallSystem"/>
+                                                            <menu key="menu" id="OeY-1N-L5Q">
+                                                                <items>
+                                                                    <menuItem title="TC" state="on" keyEquivalent="" id="Taa-B8-cCk" userLabel="TC">
+                                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                                    </menuItem>
+                                                                    <menuItem title="CF" id="8io-9v-BXN" userLabel="CF"/>
+                                                                    <menuItem title="L" id="9gr-lY-je2" userLabel="L"/>
+                                                                    <menuItem title="M3" id="tSE-BO-NqN" userLabel="M3"/>
+                                                                </items>
+                                                            </menu>
+                                                        </popUpButtonCell>
+                                                        <connections>
+                                                            <action selector="deviceSampleUnitModeAction:" target="-2" id="hxi-JM-tcm"/>
+                                                        </connections>
+                                                    </popUpButton>
                                                 </subviews>
                                             </view>
                                         </box>
                                         <box fixedFrame="YES" borderType="bezel" title="Serial Port" translatesAutoresizingMaskIntoConstraints="NO" id="dZO-Mb-UKy">
-                                            <rect key="frame" x="189" y="343" width="216" height="84"/>
+                                            <rect key="frame" x="186" y="340" width="216" height="84"/>
                                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                             <view key="contentView" id="hj9-vh-ugE">
                                                 <rect key="frame" x="0.0" y="0.0" width="216" height="72"/>
@@ -590,6 +587,17 @@
                                                 <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                                             </textFieldCell>
                                         </textField>
+                                        <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="fS3-0b-sIb">
+                                            <rect key="frame" x="331" y="425" width="62" height="14"/>
+                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                            <buttonCell key="cell" type="check" title="Verbose" bezelStyle="regularSquare" imagePosition="left" controlSize="small" state="on" inset="2" id="fg0-Cy-5x6">
+                                                <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                <font key="font" metaFont="smallSystem"/>
+                                            </buttonCell>
+                                            <connections>
+                                                <action selector="verboseAction:" target="-2" id="Knd-dy-oml"/>
+                                            </connections>
+                                        </button>
                                     </subviews>
                                 </view>
                             </tabViewItem>

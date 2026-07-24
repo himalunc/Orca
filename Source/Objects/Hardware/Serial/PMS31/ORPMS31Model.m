@@ -47,6 +47,7 @@ NSString* ORPMS31ModelPollIntervalChanged     = @"ORPMS31ModelPollIntervalChange
 NSString* ORPMS31ModelDeviceCountModeChanged  = @"ORPMS31ModelDeviceCountModeChanged";
 NSString* ORPMS31ModelDeviceSampleUnitChanged = @"ORPMS31ModelDeviceSampleUnitChanged";
 NSString* ORPMS31ModelSerialNumberChanged    = @"ORPMS31ModelSerialNumberChanged";
+NSString* ORPMS31ModelVerboseChanged         = @"ORPMS31ModelVerboseChanged";
 NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 @interface ORPMS31Model (private)
@@ -311,6 +312,18 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelSerialNumberChanged object:self];
 }
 
+- (BOOL) verbose
+{
+    return verbose;
+}
+
+- (void) setVerbose:(BOOL)aVerbose
+{
+    [[[self undoManager] prepareWithInvocationTarget:self] setVerbose:verbose];
+    verbose = aVerbose;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelVerboseChanged object:self];
+}
+
 - (BOOL) isLog
 {
     return isLog;
@@ -480,8 +493,6 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     if(index>=0 && index<kPMS31NumChannels){
         count[index] = aValue;
         [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountChanged object:self];
-        if(timeRates[index] == nil) timeRates[index] = [[ORTimeRate alloc] init];
-        [timeRates[index] addDataToTimeAverage:aValue];
     }
 }
 
@@ -527,6 +538,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 {
     self = [super initWithCoder:decoder];
     [[self undoManager] disableUndoRegistration];
+    [self setVerbose:       [decoder decodeBoolForKey:@"verbose"]];
     [self setIsLog:         [decoder decodeBoolForKey:@"isLog"]];
     [self setLocation:      [decoder decodeIntForKey:   @"location"]];
     wasRunning =            [decoder decodeBoolForKey:  @"wasRunning"];
@@ -556,6 +568,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) encodeWithCoder:(NSCoder*)encoder
 {
     [super encodeWithCoder:encoder];
+    [encoder encodeBool:    verbose         forKey:@"verbose"];
     [encoder encodeBool:    isLog           forKey:@"isLog"];
     [encoder encodeInteger: location        forKey: @"location"];
     [encoder encodeInteger: cycleDuration   forKey: @"cycleDuration"];
@@ -731,7 +744,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         // Write to register 0x0E: 0x00=Sum(cumulative), 0x01=Diff(differential)
         NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_CountMode value:deviceCountMode];
         [self addCmdToQueue:frame];
-        NSLog(@"PMS31(%d): Sending device count mode = %@ (0x%02X)\n",
+        if(verbose) NSLog(@"PMS31(%d): Sending device count mode = %@ (0x%02X)\n",
               [self uniqueIdNumber], deviceCountMode == kPMS31CountModeDiff ? @"Diff" : @"Sum", deviceCountMode);
     }
 }
@@ -749,7 +762,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     if([serialPort isOpen]){
         NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_SampleTime value:cycleDuration];
         [self addCmdToQueue:frame];
-        NSLog(@"PMS31(%d): Sending cycle duration = %d sec to device register 0x10\n",
+        if(verbose) NSLog(@"PMS31(%d): Sending cycle duration = %d sec to device register 0x10\n",
               [self uniqueIdNumber], cycleDuration);
     }
 }
@@ -759,7 +772,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     if([serialPort isOpen]){
         NSData* frame = [self buildWriteSingleRegisterFrame:kPMS31Reg_HoldTime value:holdDuration];
         [self addCmdToQueue:frame];
-        NSLog(@"PMS31(%d): Sending hold duration = %d sec to device register 0x11\n",
+        if(verbose) NSLog(@"PMS31(%d): Sending hold duration = %d sec to device register 0x11\n",
               [self uniqueIdNumber], holdDuration);
     }
 }
@@ -784,41 +797,57 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) writeSettingsToDevice
 {
     if([serialPort isOpen]){
-        NSLog(@"PMS31(%d): Loading ORCA settings to device...\n", [self uniqueIdNumber]);
+        if(verbose) NSLog(@"PMS31(%d): Loading ORCA settings to device...\n", [self uniqueIdNumber]);
         [self sendDeviceCountMode];
         [self sendDeviceUnitMode];
         [self sendCycleDuration];
         [self sendHoldDuration];
-        NSLog(@"PMS31(%d): Settings sent to device.\n", [self uniqueIdNumber]);
+        if(verbose) NSLog(@"PMS31(%d): Settings sent to device.\n", [self uniqueIdNumber]);
     }
 }
 
-- (void) sendPMS31ToInfluxDB
+- (void) sendPMS31ToInfluxDBnPlot
 {
     @autoreleasepool {
-        InFluxDB = [[[(ORAppDelegate*)[NSApp delegate] document] findObjectWithFullID:@"ORInFluxDBModel,1"] retain];
-        if(InFluxDB == nil){
-            NSLog(@"PMS31(%d): Error: Unable to find the InfluxDB model.\n", [self uniqueIdNumber]);
-            return;
-        }
-        double currentTimeStamp = [[NSDate date] timeIntervalSince1970];
-        ORInFluxDBMeasurement* measurement = [ORInFluxDBMeasurement measurementForBucket:@"ENAP_SC_UNC" org:[InFluxDB org]];
-
-        [measurement start:@"PMS31_ParticleCounts"];
-        [measurement addTag:@"unit" withString:[NSString stringWithFormat:@"%u", [self uniqueIdNumber]]];
-        [measurement addTag:@"mode" withString:[self countingModeString]];
-
-        NSArray* channelNames = @[@"0.3um", @"0.5um", @"0.7um", @"1.0um", @"2.5um", @"5.0um", @"10um"];
+        // Always update timeRates for the plot, regardless of InfluxDB status
         int i;
         for(i = 0; i < kPMS31NumChannels; i++){
-            [measurement addField:[channelNames objectAtIndex:i] withLong:(long)[self count:i]];
+            if(timeRates[i] == nil) timeRates[i] = [[ORTimeRate alloc] init];
+            [timeRates[i] addDataToTimeAverage:[self count:i]];
         }
 
-        [measurement setTimeStamp:currentTimeStamp];
-        [InFluxDB executeDBCmd:measurement];
-        [InFluxDB release];
+        // Send to InfluxDB if available — wrapped in @try/@catch so InfluxDB
+        // failures never prevent the plot from updating
+        @try {
+            InFluxDB = [[[(ORAppDelegate*)[NSApp delegate] document] findObjectWithFullID:@"ORInFluxDBModel,1"] retain];
+            if(InFluxDB == nil){
+                if(verbose) NSLog(@"PMS31(%d): InfluxDB not found — plot updated, but no InfluxDB send.\n", [self uniqueIdNumber]);
+                return;
+            }
+            double currentTimeStamp = [[NSDate date] timeIntervalSince1970];
+            ORInFluxDBMeasurement* measurement = [ORInFluxDBMeasurement measurementForBucket:@"ENAP_SC_UNC" org:[InFluxDB org]];
 
-        NSLog(@"PMS31(%d): Sent particle counts to InfluxDB\n", [self uniqueIdNumber]);
+            [measurement start:@"PMS31_ParticleCounts"];
+            [measurement addTag:@"unit" withString:[NSString stringWithFormat:@"%u", [self uniqueIdNumber]]];
+            [measurement addTag:@"mode" withString:[self countingModeString]];
+
+            NSArray* channelNames = @[@"0.3um", @"0.5um", @"0.7um", @"1.0um", @"2.5um", @"5.0um", @"10um"];
+            for(i = 0; i < kPMS31NumChannels; i++){
+                [measurement addField:[channelNames objectAtIndex:i] withLong:(long)[self count:i]];
+            }
+
+            [measurement setTimeStamp:currentTimeStamp];
+            [InFluxDB executeDBCmd:measurement];
+            [InFluxDB release];
+            InFluxDB = nil;
+
+            if(verbose) NSLog(@"PMS31(%d): Sent particle counts to InfluxDB\n", [self uniqueIdNumber]);
+        }
+        @catch (NSException *exception) {
+            NSLog(@"PMS31(%d): InfluxDB error: %@ — plot data is unaffected.\n", [self uniqueIdNumber], [exception reason]);
+            [InFluxDB release];
+            InFluxDB = nil;
+        }
     }
 }
 
@@ -867,12 +896,18 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
         [self startCycleTimer];
         [self startHoldTimer];
         [self startDataArrivalTimeout];
-        NSLog(@"PMS31(%d) Starting particle counter in %@ mode (cycle duration: %d sec)\n",[self uniqueIdNumber], [self countingModeString], cycleDuration);
+        if(verbose) NSLog(@"PMS31(%d) Starting particle counter in %@ mode (cycle duration: %d sec)\n",[self uniqueIdNumber], [self countingModeString], cycleDuration);
     }
 }
 
 - (void) stopCycle
 {
+    // In single mode, send final data before cleaning up (only if we were actually running)
+    if(countingMode == kPMS31Manual && running){
+        [self sendPMS31ToInfluxDBnPlot];
+        [self postCouchDBRecord];
+        if(verbose) NSLog(@"PMS31(%d) Single cycle: final data sent to InfluxDB and plot\n",[self uniqueIdNumber]);
+    }
     [self cancelCycleTimer];
     [self cancelHoldTimer];
     [self cancelDataArrivalTimeout];
@@ -882,7 +917,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
     [self setCycleNumber:0];
     [self setRunning:NO];
-    NSLog(@"PMS31(%d) Stopping particle counter. Was in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
+    if(verbose) NSLog(@"PMS31(%d) Stopping particle counter. Was in %@ mode\n",[self uniqueIdNumber], [self countingModeString]);
 }
 
 
@@ -996,7 +1031,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     // Base class cleared the queue and set lastRequest=nil.
     // If we're still running, restart polling so we keep trying.
     if(running && [serialPort isOpen]){
-        NSLog(@"PMS31(%d) Recovering from timeout, restarting polling.\n",[self uniqueIdNumber]);
+        if(verbose) NSLog(@"PMS31(%d) Recovering from timeout, restarting polling.\n",[self uniqueIdNumber]);
         [dataBuffer setLength:0]; // clear stale data
         [self startPolling];
     }
@@ -1082,21 +1117,19 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 
 - (void) cycleComplete
 {
-    NSLog(@"PMS31(%d) Cycle %d complete.\n",[self uniqueIdNumber], [self cycleNumber]);
-    
-    // Post the data record with current counts [add influxDB here]
-    [self postCouchDBRecord];
+    if(verbose) NSLog(@"PMS31(%d) Cycle %d complete.\n",[self uniqueIdNumber], [self cycleNumber]);
     
     if(countingMode == kPMS31Auto){
+        // Post CouchDB record for auto mode
+        [self postCouchDBRecord];
         // Device handles the hold delay via register 0x11.
         // ORCA's cycle timer already accounts for cycleDuration + holdDuration,
         // so we restart the next cycle immediately here.
         [self startNextCycle];
     }
     else {
-        // Manual/Single mode: send to InfluxDB after cycle, then stop
-        NSLog(@"PMS31(%d) Single cycle finished.\n",[self uniqueIdNumber]);
-        [self sendPMS31ToInfluxDB];
+        // Manual/Single mode: stopCycle handles sending data to InfluxDB, plot, and CouchDB
+        if(verbose) NSLog(@"PMS31(%d) Single cycle finished.\n",[self uniqueIdNumber]);
         [self stopCycle];
     }
 }
@@ -1116,7 +1149,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     [self startHoldTimer];
     [self startPolling];           // ensure polling is active
     [self startDataArrivalTimeout]; // reset safety net
-    NSLog(@"PMS31(%d) Starting cycle %d\n",[self uniqueIdNumber],[self cycleNumber]);
+    if(verbose) NSLog(@"PMS31(%d) Starting cycle %d\n",[self uniqueIdNumber],[self cycleNumber]);
 }
 
 - (void) startDataArrivalTimeout
@@ -1133,9 +1166,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) doCycleKick
 {
     [self setMissedCycleCount:missedCycleCount+1];
-    NSLogColor([NSColor redColor],@"%@ data did not arrive at end of cycle (missed %d)\n",[self fullID],missedCycleCount);
+    if(verbose) NSLogColor([NSColor redColor],@"%@ data did not arrive at end of cycle (missed %d)\n",[self fullID],missedCycleCount);
     if(countingMode == kPMS31Auto){
-        NSLogColor([NSColor redColor],@"Kickstarting %@\n",[self fullID]);
+        if(verbose) NSLogColor([NSColor redColor],@"Kickstarting %@\n",[self fullID]);
         int i;
         for(i=0;i<kPMS31NumChannels;i++){
             [self setCount:i value:0];
@@ -1161,10 +1194,10 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 - (void) holdModeAction
 {
     // Fires at the start of hold period (after cycleDuration, before holdDuration ends)
-    // Poll for final counts and send to InfluxDB in repeating mode
-    if(countingMode == kPMS31Auto && [serialPort isOpen]){
+    // Poll for final counts and send to InfluxDB for both single and repeating modes
+    if([serialPort isOpen]){
         [self readParticleCounts];
-        [self sendPMS31ToInfluxDB];
+        [self sendPMS31ToInfluxDBnPlot];
     }
 }
 
@@ -1176,7 +1209,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             [self processOneCommandFromQueue];
         }
     }
-    else NSLog(@"PMS31 (%d): Serial Port not open. Cmd Ignored.\n",[self uniqueIdNumber]);
+    else if(verbose) NSLog(@"PMS31 (%d): Serial Port not open. Cmd Ignored.\n",[self uniqueIdNumber]);
 }
 
 - (void) processModbusResponse:(NSData*)responseData
@@ -1193,7 +1226,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     unsigned short calcCRC = [self modbusCalcCRC:bytes length:len-2];
     
     if(receivedCRC != calcCRC){
-        NSLog(@"PMS31(%d): CRC mismatch in response. Expected 0x%04X, got 0x%04X\n",
+        if(verbose) NSLog(@"PMS31(%d): CRC mismatch in response. Expected 0x%04X, got 0x%04X\n",
               [self uniqueIdNumber], calcCRC, receivedCRC);
         [self setLastRequest:nil];
         [self processOneCommandFromQueue];
@@ -1207,7 +1240,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     // Check for error response
     if(funcCode & 0x80){
         unsigned char errCode = bytes[2];
-        NSLog(@"PMS31(%d): Modbus error response. FC=0x%02X, Error=0x%02X\n",
+        if(verbose) NSLog(@"PMS31(%d): Modbus error response. FC=0x%02X, Error=0x%02X\n",
               [self uniqueIdNumber], funcCode & 0x7F, errCode);
         [self setLastRequest:nil];
         [self processOneCommandFromQueue];
@@ -1271,12 +1304,13 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             [self setCycleDuration:readSampleTime];
             [self setHoldDuration:readHoldTime];
             
-            NSLog(@"PMS31(%d): Device Settings Loaded:\n", [self uniqueIdNumber]);
-            NSLog(@"  Count Mode   = %d (%@)\n", readCountMode,
-                  readCountMode == kPMS31CountModeSum ? @"Sum/Cumulative" : @"Diff/Differential");
-            NSLog(@"  Sample Unit  = %d\n", readSampleUnit);
-            NSLog(@"  Sample Time  = %d sec\n", readSampleTime);
-            NSLog(@"  Hold Time    = %d sec\n", readHoldTime);
+            if(verbose){
+                NSLog(@"PMS31(%d): Device Settings Loaded:\n", [self uniqueIdNumber]);
+                NSLog(@"  Count Mode   = (%@)\n", readCountMode == kPMS31CountModeSum ? @"Sum" : @"Diff");
+                NSLog(@"  Sample Unit  = %@\n", readSampleUnit == kPMS31SampleUnitL ? @"L" : (readSampleUnit == kPMS31SampleUnitCF ? @"CF" : @"TC"));
+                NSLog(@"  Sample Time  = %d sec\n", readSampleTime);
+                NSLog(@"  Hold Time    = %d sec\n", readHoldTime);
+            }
         }
         else if(byteCount == 2){ // 2 bytes = 1 register → device status (StartStop register)
             int regVal = (bytes[3] << 8) | bytes[4];
@@ -1284,15 +1318,22 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             if(deviceRunning != running){
                 [self setRunning:deviceRunning];
                 if(deviceRunning){
-                    NSLog(@"PMS31(%d): Device started externally — syncing ORCA state\n", [self uniqueIdNumber]);
+                    if(verbose) NSLog(@"PMS31(%d): Device started externally — syncing ORCA state\n", [self uniqueIdNumber]);
                     if(cycleNumber == 0) [self setCycleNumber:1];
                     [self setCycleStarted:[NSDate date]];
                     [self startCycleTimer];
                     [self startDataArrivalTimeout];
                 }
                 else {
-                    NSLog(@"PMS31(%d): Device stopped externally — syncing ORCA state\n", [self uniqueIdNumber]);
+                    if(verbose) NSLog(@"PMS31(%d): Device stopped externally — syncing ORCA state\n", [self uniqueIdNumber]);
+                    // In single mode, send final data before cleaning up
+                    if(countingMode == kPMS31Manual){
+                        [self sendPMS31ToInfluxDBnPlot];
+                        [self postCouchDBRecord];
+                        if(verbose) NSLog(@"PMS31(%d): Single cycle data sent to InfluxDB and plot\n", [self uniqueIdNumber]);
+                    }
                     [self cancelCycleTimer];
+                    [self cancelHoldTimer];
                     [self cancelDataArrivalTimeout];
                     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(startNextCycle) object:nil];
                     [self setCycleNumber:0];
@@ -1300,7 +1341,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             }
         }
         else {
-            NSLog(@"PMS31(%d): Holding register response with %d bytes (unhandled)\n",
+            if(verbose) NSLog(@"PMS31(%d): Holding register response with %d bytes (unhandled)\n",
                   [self uniqueIdNumber], byteCount);
         }
     }
@@ -1319,7 +1360,7 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
     else if(funcCode == kPMS31FC_WriteMultiReg){
         // Write multiple registers response — time sync confirmation
-        NSLog(@"PMS31(%d): Time sync confirmed\n",[self uniqueIdNumber]);
+        if(verbose) NSLog(@"PMS31(%d): Time sync confirmed\n",[self uniqueIdNumber]);
     }
     
     [self setLastRequest:nil];

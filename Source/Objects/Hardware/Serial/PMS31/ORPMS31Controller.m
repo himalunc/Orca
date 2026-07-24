@@ -223,6 +223,11 @@
                         object: model];
 
     [notifyCenter addObserver : self
+                     selector : @selector(verboseChanged:)
+                         name : ORPMS31ModelVerboseChanged
+                        object: model];
+
+    [notifyCenter addObserver : self
                      selector : @selector(isLogChanged:)
                          name : ORPMS31ModelIsLogChanged
                         object: model];
@@ -287,6 +292,7 @@
     [self miscAttributesChanged:nil];
     [self maxCountsChanged:nil];
     [self countAlarmLimitChanged:nil];
+    [self verboseChanged:nil];
     [self isLogChanged:nil];
     [self timedOutChanged:nil];
     [self slaveAddressChanged:nil];
@@ -311,6 +317,11 @@
 - (void) portStateChanged:(NSNotification*)aNote
 {
     [self updateButtons];
+}
+
+- (void) verboseChanged:(NSNotification*)aNote
+{
+    [verboseCB setIntValue: [model verbose]];
 }
 
 - (void) isLogChanged:(NSNotification*)aNote
@@ -571,6 +582,11 @@
 }
 
 #pragma mark ***Actions
+
+- (IBAction) verboseAction:(id)sender
+{
+    [model setVerbose:[sender intValue]];
+}
 
 - (IBAction) isLogAction:(id)sender
 {

@@ -102,6 +102,7 @@
         int             expectedResponseLength;
         NSString*       serialNumber;
         ORInFluxDBModel* InFluxDB;
+        BOOL            verbose;
 }
 
 
@@ -153,6 +154,8 @@
 - (int) missedCycleCount;
 - (NSString*) serialNumber;
 - (void) setSerialNumber:(NSString*)aSerialNumber;
+- (BOOL) verbose;
+- (void) setVerbose:(BOOL)aVerbose;
 
 #pragma mark ***Polling
 - (void) startCycle:(BOOL)force;
@@ -173,7 +176,7 @@
 - (void) writeSettingsToDevice;
 - (void) readDeviceStatus;
 - (void) probeDevice;
-- (void) sendPMS31ToInfluxDB;
+- (void) sendPMS31ToInfluxDBnPlot;
 
 #pragma mark ***Modbus Helpers
 - (unsigned int) modbusCalcCRC:(unsigned char*)data length:(int)length;
@@ -222,4 +225,5 @@ extern NSString* ORPMS31ModelDeviceCountModeChanged;
 extern NSString* ORPMS31ModelDeviceSampleUnitChanged;
 extern NSString* ORPMS31ModelSerialNumberChanged;
 
+extern NSString* ORPMS31ModelVerboseChanged;
 extern NSString* ORPMS31Lock;
