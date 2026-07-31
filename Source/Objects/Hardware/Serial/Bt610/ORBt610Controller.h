@@ -31,9 +31,11 @@
 	IBOutlet NSTextField*	timedOutField;
 	IBOutlet NSButton*		isLogCB;
 	IBOutlet NSTextField*	holdTimeField;
+    IBOutlet NSTextField*   pollTimeField;
 	IBOutlet NSTextField*	tempUnitsField;
 	IBOutlet NSPopUpButton* tempUnitsPU;
-	IBOutlet NSTextField*   numSamplesField;
+	IBOutlet NSPopUpButton*   numSamplesField;
+	IBOutlet NSPopUpButton* countingModePU;
 	IBOutlet NSPopUpButton* countUnitsPU;
 	IBOutlet NSTextField*	humidityField;
     IBOutlet NSTextField*   temperatureField;
@@ -45,6 +47,8 @@
     IBOutlet NSButton*      clearAllButton;
     IBOutlet NSButton*      dumpAllButton;
     IBOutlet NSButton*      dumpRecentButton;
+    IBOutlet NSButton*      loadSettingsButton;
+    IBOutlet NSButton*      syncSettingsButton;
 
 	IBOutlet NSTextField*	cycleDurationField;
     IBOutlet NSButton*      startCycleButton;
@@ -58,6 +62,8 @@
 	IBOutlet NSTextField*   actualDurationField;
     IBOutlet NSTextField*   opTimerField;
     IBOutlet NSTextField*   measurementDateField;
+    IBOutlet NSTextField*   serialNumberField;
+    IBOutlet NSTextField*   softwareVersionField;
 	IBOutlet ORCompositeTimeLineView*   plotter0;
 	IBOutlet NSMatrix* countAlarmLimitMatrix;
 	IBOutlet NSMatrix* maxCountsMatrix;
@@ -83,6 +89,8 @@
 
 #pragma mark ***Interface Management
 - (void) measurementDateChanged:(NSNotification*)aNote;
+- (void) serialNumberChanged:(NSNotification*)aNote;
+- (void) softwareVersionChanged:(NSNotification*)aNote;
 - (void) opTimerChanged:(NSNotification*)aNote;
 - (void) dumpCountChanged:(NSNotification*)aNote;
 - (void) dumpInProgressChanged:(NSNotification*)aNote;
@@ -90,6 +98,7 @@
 - (void) actualDurationChanged:(NSNotification*)aNote;
 - (void) isLogChanged:(NSNotification*)aNote;
 - (void) holdTimeChanged:(NSNotification*)aNote;
+- (void) pollTimeChanged:(NSNotification*)aNote;
 - (void) tempUnitsChanged:(NSNotification*)aNote;
 - (void) countUnitsChanged:(NSNotification*)aNote;
 - (void) statusBitsChanged:(NSNotification*)aNote;
@@ -114,18 +123,26 @@
 #pragma mark ***Actions
 - (IBAction) isLogAction:(id)sender;
 - (IBAction) holdTimeAction:(id)sender;
+- (IBAction) pollTimeAction:(id)sender;
 - (IBAction) tempUnitsAction:(id)sender;
 - (IBAction) countAlarmLimitAction:(id)sender;
 - (IBAction) maxCountsAction:(id)sender;
+- (int) digitsOnlyValue:(NSString*)aString;
 - (IBAction) lockAction:(id) sender;
 - (IBAction) cycleDurationAction:(id)sender;
 - (IBAction) startCycleAction:(id)sender;
 - (IBAction) stopCycleAction:(id)sender;
 - (IBAction) countUnitsAction:(id)sender;
 - (IBAction) numSamplesAction:(id)sender;
+- (IBAction) countingModeAction:(id)sender;
 - (IBAction) dumpAllDataAction:(id)sender;
 - (IBAction) dumpNewDataAction:(id)sender;
 - (IBAction) clearAllAction:(id)sender;
+- (IBAction) readSerialNumberAction:(id)sender;
+- (IBAction) readSoftwareVersionAction:(id)sender;
+- (IBAction) probeModelAction:(id)sender;
+- (IBAction) loadSettingsAction:(id)sender;
+- (IBAction) syncSettingsAction:(id)sender;
 
 #if !defined(MAC_OS_X_VERSION_10_10) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_10 // 10.10-specific
 - (void) clearDataSheetDidEnd:(id)sheet returnCode:(int)returnCode contextInfo:(NSDictionary*)userInfo;

@@ -43,6 +43,22 @@
 	[super dealloc];
 }
 
+//recursively find a standalone (non-popup) NSTextField whose stringValue matches aString
+- (NSTextField*) findTextFieldWithString:(NSString*)aString inView:(NSView*)aView
+{
+	if(aView == nil) return nil;
+	for(NSView* sub in [aView subviews]){
+		if([sub isKindOfClass:[NSTextField class]] &&
+		   ![sub isKindOfClass:[NSPopUpButton class]] &&
+		   [[(NSTextField*)sub stringValue] isEqualToString:aString]){
+			return (NSTextField*)sub;
+		}
+		NSTextField* found = [self findTextFieldWithString:aString inView:sub];
+		if(found) return found;
+	}
+	return nil;
+}
+
 - (void) awakeFromNib
 {
 
@@ -110,7 +126,26 @@
 		[[countAlarmLimitMatrix cellAtRow:i column:0] setTag:i];
 		[[maxCountsMatrix cellAtRow:i column:0] setTag:i];
 	}
-	
+
+	//relabel the "Duration:" field to "Start Time:" (the ST sample-time setting).
+	//Done in code because the runtime nib is a compiled NIBArchive that can't be
+	//safely byte-edited; the cycleDurationField's sibling label is the target.
+	for(NSView* aView in [[cycleDurationField superview] subviews]){
+		if([aView isKindOfClass:[NSTextField class]] &&
+		   [[(NSTextField*)aView stringValue] isEqualToString:@"Duration:"]){
+			[(NSTextField*)aView setStringValue:@"Start Time:"];
+			break;
+		}
+	}
+
+	//if the units display field wasn't connected in the nib, locate it at runtime by its
+	//default title so -countUnitsChanged: can still update it (no IB outlet required).
+	if(unitsField == nil){
+		unitsField = [self findTextFieldWithString:@"Counts/Ft^3" inView:totalView];
+		if(unitsField == nil) unitsField = [self findTextFieldWithString:@"Counts/Ft^3" inView:tabView];
+		if(unitsField == nil) unitsField = [self findTextFieldWithString:@"Counts/Ft^3" inView:[[self window] contentView]];
+	}
+
 	blankView = [[NSView alloc] init];
     basicOpsSize	= NSMakeSize(422,528);
     processOpsSize	= NSMakeSize(422,370);
@@ -243,6 +278,10 @@
                      selector : @selector(holdTimeChanged:)
                          name : ORBt610ModelHoldTimeChanged
 						object: model];
+    [notifyCenter addObserver : self
+                     selector : @selector(pollTimeChanged:)
+                         name : ORBt610ModelPollTimeChanged
+                        object: model];
 
     [notifyCenter addObserver : self
                      selector : @selector(isLogChanged:)
@@ -278,7 +317,17 @@
                      selector : @selector(measurementDateChanged:)
                          name : ORBt610ModelMeasurementDateChanged
                         object: model];
-    
+
+    [notifyCenter addObserver : self
+                     selector : @selector(serialNumberChanged:)
+                         name : ORBt610ModelSerialNumberChanged
+                        object: model];
+
+    [notifyCenter addObserver : self
+                     selector : @selector(softwareVersionChanged:)
+                         name : ORBt610ModelSoftwareVersionChanged
+                        object: model];
+
 	[serialPortController registerNotificationObservers];
 	
 }
@@ -292,6 +341,8 @@
 	[self numSamplesChanged:nil];
 	[self cycleDurationChanged:nil];
     [self measurementDateChanged:nil];
+    [self serialNumberChanged:nil];
+    [self softwareVersionChanged:nil];
 	[self runningChanged:nil];
 	[self cycleStartedChanged:nil];
 	[self cycleNumberChanged:nil];
@@ -315,6 +366,16 @@
 - (void) opTimerChanged:(NSNotification*)aNote
 {
     [opTimerField setStringValue:[model opTimer]];
+}
+
+- (void) serialNumberChanged:(NSNotification*)aNote
+{
+    [serialNumberField setStringValue: [model serialNumber]];
+}
+
+- (void) softwareVersionChanged:(NSNotification*)aNote
+{
+    [softwareVersionField setStringValue: [model softwareVersion]];
 }
 
 - (void) measurementDateChanged:(NSNotification*)aNote
@@ -349,6 +410,10 @@
 	[holdTimeField setIntValue: [model holdTime]];
 }
 
+- (void) pollTimeChanged:(NSNotification*)aNote
+{
+    [pollTimeField setIntValue: [model pollTime]];
+}
 - (void) actualDurationChanged:(NSNotification*)aNote
 {
 	[actualDurationField setIntValue: [model actualDuration]];
@@ -358,6 +423,7 @@
 {
 	[tempUnitsField setStringValue: [model tempUnits]==0?@"C":@"F"];
 	[tempUnitsPU selectItemAtIndex: [model tempUnits]];
+    [self updateButtons];
 }
 
 - (void) countUnitsChanged:(NSNotification*)aNote
@@ -370,6 +436,7 @@
     else if([model countUnits]==3)  s = @"Counts/M^3";
 	[unitsField setStringValue:s];
 	[plotter0 setYLabel:s];
+    [self updateButtons];
 }
 
 - (void) statusBitsChanged:(NSNotification*)aNote
@@ -497,8 +564,10 @@
 
 - (void) numSamplesChanged:(NSNotification*)aNote
 {
-	[numSamplesField setIntValue: [model numSamples]];
-	[self updateButtons];
+	//countingModePU and numSamplesField are the SAME popup: select the mode item ONCE.
+	//(setIntValue: on a popup whose items both have tag 0 fights selectItemAtIndex: and
+	//caused the mode to flip back.) numSamples==0 -> Repeat (0), else Single (1).
+	[countingModePU selectItemAtIndex: [model numSamples]==0 ? 0 : 1];
 }
 
 - (void) countChanged:(NSNotification*)aNote
@@ -540,12 +609,15 @@
     [holdTimeField setEnabled:![model running] && !locked];
 	[cycleDurationField setEnabled:![model running] && !locked];
 	[numSamplesField setEnabled:![model running] && !locked];
+	[countingModePU setEnabled:![model running] && !locked];
 	[countUnitsPU setEnabled:![model running] && !locked];
 	[tempUnitsPU setEnabled:![model running] && !locked];
 	[clearAllButton setEnabled:![model running] && !locked];
 	[dumpAllButton setEnabled:![model running]];
 	[dumpRecentButton setEnabled:![model running]];
-	
+	[loadSettingsButton setEnabled:![model running] && !locked]; //writes to device: idle only
+	[syncSettingsButton setEnabled:!locked];                     //reads from device: anytime
+
 }
 
 - (void)tabView:(NSTabView *)aTabView didSelectTabViewItem:(NSTabViewItem *)tabViewItem
@@ -596,17 +668,36 @@
 	[model setHoldTime:[sender intValue]];	
 }
 
+- (void) pollTimeAction:(id)sender
+{
+    [model setPollTime:[sender intValue]];
+}
+
 - (IBAction) numSamplesAction:(id)sender
 {
 	[model setNumSamples:[sender intValue]];
-    [self updateButtons];
+    //[self updateButtons];
+}
+
+//Counting mode popup: index 0 = Repeating (SN 0), index 1 = Single (SN n).
+//Only updates ORCA; the SN command is sent to the machine via Load Settings.
+- (IBAction) countingModeAction:(id)sender
+{
+	if([sender indexOfSelectedItem] == 0){
+		[model setNumSamples:0];               //Repeating
+	}
+	else if([model numSamples] == 0){
+		[model setNumSamples:1];               //switch to Single: default to 1 sample
+	}
+	[self updateButtons];
 }
 
 - (IBAction) tempUnitsAction:(id)sender
 {
+	//only update ORCA; the machine is written only via the Load Settings button
 	[model setTempUnits:(int)[sender indexOfSelectedItem]];
 }
-
+/*
 - (IBAction) countAlarmLimitAction:(id)sender
 {
 	[model setIndex:(int)[[sender selectedCell] tag] countAlarmLimit:[[sender selectedCell] floatValue]];	
@@ -616,6 +707,28 @@
 {
 	[model setIndex:(int)[[sender selectedCell] tag] maxCounts:[[sender selectedCell] floatValue]];
 }
+*/
+- (IBAction) countAlarmLimitAction:(id)sender
+{
+    int value = [self digitsOnlyValue:[[sender selectedCell] stringValue]];
+    [model setIndex:(int)[[sender selectedCell] tag] countAlarmLimit:(float)value];
+}
+
+- (IBAction) maxCountsAction:(id)sender
+{
+    int value = [self digitsOnlyValue:[[sender selectedCell] stringValue]];
+    [model setIndex:(int)[[sender selectedCell] tag] maxCounts:(float)value];
+}
+
+//strip any grouping separators (comma, space, non-breaking space, etc.) so the
+//value parses correctly regardless of the user's macOS Region/locale settings
+- (int) digitsOnlyValue:(NSString*)aString
+{
+    NSCharacterSet* nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    NSString* digits = [[aString componentsSeparatedByCharactersInSet:nonDigits] componentsJoinedByString:@""];
+    return [digits intValue];
+}
+
 
 - (IBAction) startCycleAction:(id)sender
 {
@@ -643,7 +756,38 @@
 
 - (IBAction) countUnitsAction:(id)sender
 {
+	//only update ORCA; the machine is written only via the Load Settings button
 	[model setCountUnits:(int)[sender indexOfSelectedItem]];
+}
+
+- (IBAction) readSerialNumberAction:(id)sender
+{
+	[model getSerialNumber]; //sends SS; reply updates serialNumberField
+}
+
+- (IBAction) readSoftwareVersionAction:(id)sender
+{
+	[model getSoftwareVersion]; //sends RV; reply updates softwareVersionField
+}
+
+- (IBAction) probeModelAction:(id)sender
+{
+	//queries serial #, software version, and all settings, then prints a summary to the log
+	[model probeModel];
+}
+
+//Load Settings: push ORCA's configured settings out to the machine
+- (IBAction) loadSettingsAction:(id)sender
+{
+	[self endEditing];
+	[model writeSettingsToDevice];
+}
+
+//Sync Settings: pull the machine's current settings back into ORCA
+- (IBAction) syncSettingsAction:(id)sender
+{
+	[model readSettingsFromDevice];
+	//[model getSerialNumber];
 }
 
 - (IBAction) dumpAllDataAction:(id)sender

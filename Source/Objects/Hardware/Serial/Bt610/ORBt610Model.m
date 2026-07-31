@@ -31,6 +31,7 @@ NSString* ORBt610ModelDumpCountChanged		    = @"ORBt610ModelDumpCountChanged";
 NSString* ORBt610ModelDumpInProgressChanged     = @"ORBt610ModelDumpInProgressChanged";
 NSString* ORBt610ModelIsLogChanged			    = @"ORBt610ModelIsLogChanged";
 NSString* ORBt610ModelHoldTimeChanged		    = @"ORBt610ModelHoldTimeChanged";
+NSString* ORBt610ModelPollTimeChanged            = @"ORBt610ModelPollTimeChanged";
 NSString* ORBt610ModelTempUnitsChanged		    = @"ORBt610ModelTempUnitsChanged";
 NSString* ORBt610ModelCountUnitsChanged	        = @"ORBt610ModelCountUnitsChanged";
 NSString* ORBt610ModelStatusBitsChanged	        = @"ORBt610ModelStatusBitsChanged";
@@ -49,6 +50,8 @@ NSString* ORBt610ModelCountChanged			    = @"ORBt610ModelCount2Changed";
 NSString* ORBt610ModelMissedCountChanged        = @"ORBt610ModelMissedCountChanged";
 NSString* ORBt610ModelOpTimerChanged            = @"ORBt610ModelOpTimerChanged";
 NSString* ORBt610ModelMeasurementDateChanged    = @"ORBt610ModelMeasurementDateChanged";
+NSString* ORBt610ModelSerialNumberChanged       = @"ORBt610ModelSerialNumberChanged";
+NSString* ORBt610ModelSoftwareVersionChanged    = @"ORBt610ModelSoftwareVersionChanged";
 
 NSString* ORBt610Lock = @"ORBt610Lock";
 
@@ -90,6 +93,8 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     [buffer release];
     [opTimer release];
     [measurementDate release];
+    [serialNumber release];
+    [softwareVersion release];
 
 	int i;
 	for(i=0;i<8;i++){
@@ -124,6 +129,8 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 - (void) wakeUp
 {
 	[super wakeUp];
+	//resume the heartbeat (sleep cancels all scheduled perform requests)
+	if([serialPort isOpen]) [self pollDevice];
 }
 
 - (void) setUpImage
@@ -243,6 +250,11 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     return holdTime;
 }
 
+- (int) pollTime
+{
+    return pollTime;
+}
+
 - (void) setHoldTime:(int)aHoldTime
 {
 	if(aHoldTime<0)aHoldTime = 0;
@@ -250,6 +262,15 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     [[[self undoManager] prepareWithInvocationTarget:self] setHoldTime:holdTime];
     holdTime = aHoldTime;
     [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelHoldTimeChanged object:self];
+}
+
+- (void) setPollTime:(int)aPollTime
+{
+    if(aPollTime<0)aPollTime = 0;
+    if(aPollTime>9999)aPollTime = 9999;
+    [[[self undoManager] prepareWithInvocationTarget:self] setPollTime:pollTime];
+    pollTime = aPollTime;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelPollTimeChanged object:self];
 }
 - (void) setOpTimer:(NSString*)aValue
 {
@@ -387,8 +408,8 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 {
     humidity = aHumidity;
     [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelHumidityChanged object:self];
-	if(timeRates[7] == nil) timeRates[7] = [[ORTimeRate alloc] init];
-	[timeRates[7] addDataToTimeAverage:humidity];
+	//plot points are added only at sample completion (see -process_response:), not here,
+	//so the poll can refresh the table without adding points to the plot.
 }
 
 - (float) temperature
@@ -400,9 +421,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 {
     temperature = aTemperature;
     [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelTemperatureChanged object:self];
-	if(timeRates[6] == nil) timeRates[6] = [[ORTimeRate alloc] init];
-	[timeRates[6] addDataToTimeAverage:temperature];
-
+	//plot points added only at sample completion (see -process_response:), not here.
 }
 - (NSString*) measurementDate
 {
@@ -416,6 +435,34 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     measurementDate = [aMeasurementDate copy];
 
     [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelMeasurementDateChanged object:self];
+}
+
+- (NSString*) serialNumber
+{
+    if(!serialNumber)return @"";
+    else return serialNumber;
+}
+
+- (void) setSerialNumber:(NSString*)aSerialNumber
+{
+    [serialNumber autorelease];
+    serialNumber = [aSerialNumber copy];
+
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelSerialNumberChanged object:self];
+}
+
+- (NSString*) softwareVersion
+{
+    if(!softwareVersion)return @"";
+    else return softwareVersion;
+}
+
+- (void) setSoftwareVersion:(NSString*)aSoftwareVersion
+{
+    [softwareVersion autorelease];
+    softwareVersion = [aSoftwareVersion copy];
+
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelSoftwareVersionChanged object:self];
 }
 
 - (int) actualDuration
@@ -544,6 +591,9 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 
 - (void) setNumSamples:(int)aNum
 {
+    if(aNum < 0) aNum = 0;
+    else if(aNum > 1) aNum = 1;
+    [[[self undoManager] prepareWithInvocationTarget:self] setNumSamples:numSamples];
     numSamples = aNum;
 
     [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelNumSamplesChanged object:self];
@@ -560,8 +610,8 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 	if(index>=0 && index<6){
 		count[index] = aValue;
 		[[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelCountChanged object:self];
-		if(timeRates[index] == nil) timeRates[index] = [[ORTimeRate alloc] init];
-		[timeRates[index] addDataToTimeAverage:aValue];
+		//plot points added only at sample completion (see -process_response:), not here, so
+		//the every-poll table refresh does not add points to the plot.
 	}
 }
 
@@ -581,7 +631,9 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 
 - (void) firstActionAfterOpeningPort
 {
-	[self probe];
+	//only start the run-state heartbeat. Settings/serial number are read only when the
+	//user clicks Sync Settings — nothing is auto-synced on connect.
+	[self pollDevice];
 }
 
 #pragma mark ***Archival
@@ -591,6 +643,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 	[[self undoManager] disableUndoRegistration];
 	[self setIsLog:				[decoder decodeBoolForKey:@"isLog"]];
 	[self setHoldTime:			[decoder decodeIntForKey:   @"holdTime"]];
+    [self setPollTime:          [decoder decodeIntForKey:   @"pollTime"]];
 	[self setTempUnits:			[decoder decodeIntForKey:   @"tempUnits"]];
 	[self setCountUnits:		[decoder decodeIntForKey:   @"countUnits"]];
 	[self setLocation:			[decoder decodeIntForKey:   @"location"]];
@@ -614,6 +667,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     [super encodeWithCoder:encoder];
     [encoder encodeBool:	isLog			forKey: @"isLog"];
     [encoder encodeInteger:	holdTime		forKey: @"holdTime"];
+    [encoder encodeInteger: pollTime        forKey: @"pollTime"];
     [encoder encodeInteger:	tempUnits		forKey: @"tempUnits"];
     [encoder encodeInteger:	countUnits		forKey: @"countUnits"];
     [encoder encodeInteger:	location		forKey: @"location"];
@@ -665,15 +719,75 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 - (void) getSampleTime				{ [self addCmdToQueue:@"ST"]; }
 - (void) getLocation				{ [self addCmdToQueue:@"ID"]; }
 - (void) getHoldTime                { [self addCmdToQueue:@"SH"]; }
-- (void) getUnits                   { [self addCmdToQueue:@"CU\rTU"]; }
+- (void) getUnits                   { [self addCmdToQueue:@"1"]; }
+- (void) getSerialNumber            { [self addCmdToQueue:@"SS"]; }
+- (void) getSoftwareVersion         { [self addCmdToQueue:@"RV"]; }
+- (void) getLastRecord              { readingLastRecord = YES; [self addCmdToQueue:@"4 1"]; } //last 1 record -> refresh count table
 
 - (void) sendNumSamples:(int)aValue { [self addCmdToQueue:[NSString stringWithFormat:@"SN %d",aValue]]; }
 - (void) sendCountingTime:(int)aValue { [self addCmdToQueue:[NSString stringWithFormat:@"ST %d",aValue]]; }
 - (void) sendID:(int)aValue			{ [self addCmdToQueue:[NSString stringWithFormat:@"ID %d",aValue]]; }
 - (void) sendHoldTime:(int)aValue	{ [self addCmdToQueue:[NSString stringWithFormat:@"SH %d",aValue]]; }
-- (void) sendTempUnit:(int)aTempUnit countUnits:(int)aCountUnit		{ int esc = 27; [self addCmdToQueue:[NSString stringWithFormat:@"CU %d\r%cTU %d",aTempUnit,esc,aCountUnit]]; }
+//CU and TU must be sent as separate ESC-framed commands: the device resets its input
+//buffer on every ESC, so combining them in one frame discards all but the last command.
+//- (void) sendTempUnit:(int)aTempUnit countUnits:(int)aCountUnit		{ [self sendCountUnits:aCountUnit]; [self sendTempUnits:aTempUnit]; }
+- (void) sendCountUnits:(int)aCountUnit	{ [self addCmdToQueue:[NSString stringWithFormat:@"CU %d",aCountUnit]]; }
+- (void) sendTempUnits:(int)aTempUnit	{ [self addCmdToQueue:[NSString stringWithFormat:@"TU %d",aTempUnit]]; }
 - (void) probe						{ probing = YES; [self getOpStatus]; }
 - (void) getOpStatus                { [self addCmdToQueue:@"OP"]; }
+
+//push all ORCA-configured settings to the device (mirrors PMS31 -writeSettingsToDevice)
+- (void) writeSettingsToDevice
+{
+	if([serialPort isOpen]){
+		NSLog(@"Bt610(%d): Loading all ORCA settings to device...\n",[self uniqueIdNumber]);
+		[self setDate];
+		[self sendID:location];
+		[self sendHoldTime:holdTime];
+		[self sendNumSamples:numSamples];
+		[self sendTempUnits:tempUnits];
+        [self sendCountUnits:countUnits];
+		[self sendCountingTime:cycleDuration];
+	}
+}
+
+//query the device for identity + all settings, then print a consolidated summary
+- (void) probeModel
+{
+	if([serialPort isOpen]){
+		NSLog(@"Bt610(%d): Probing model (serial #, software version, settings)...\n",[self uniqueIdNumber]);
+		[self getSerialNumber];    //SS
+		[self getSoftwareVersion]; //RV
+		[self getUnits];           //CU, TU
+		[self getSampleTime];      //ST
+		[self getHoldTime];        //SH
+		[self getLocation];        //ID
+		//give the replies time to arrive, then print everything the model now holds
+		[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(printModelSummary) object:nil];
+		[self performSelector:@selector(printModelSummary) withObject:nil afterDelay:3];
+	}
+	else NSLog(@"Bt610(%d): Serial Port not open. Cannot probe model.\n",[self uniqueIdNumber]);
+}
+
+- (void) printModelSummary
+{
+	NSString* cu = @"?";
+	if(countUnits==0)      cu = @"Counts/Ft^3";
+	else if(countUnits==1) cu = @"Counts/L";
+	else if(countUnits==2) cu = @"Total Counts";
+	else if(countUnits==3) cu = @"Counts/M^3";
+
+	NSLog(@"========== Bt610(%d) Model Probe ==========\n",[self uniqueIdNumber]);
+	NSLog(@"Serial Number   : %@\n",[self serialNumber]);
+	NSLog(@"Software Version: %@\n",[self softwareVersion]);
+	NSLog(@"Count Units     : %@ (%d)\n",cu,countUnits);
+	NSLog(@"Temp Units      : %@ (%d)\n",tempUnits==0?@"C":@"F",tempUnits);
+	NSLog(@"Start Time (ST) : %d s\n",cycleDuration);
+	NSLog(@"Hold Time (SH)  : %d s\n",holdTime);
+	NSLog(@"Num Samples (SN): %d%@\n",numSamples,numSamples==0?@" (repeat)":@"");
+	NSLog(@"Location ID     : %d\n",location);
+	NSLog(@"===========================================\n");
+}
 
 #pragma mark ***Polling and Cycles
 - (void) startCycle
@@ -687,12 +801,11 @@ NSString* ORBt610Lock = @"ORBt610Lock";
         [self enqueueCmd:@"++Delay"];
 		[self setCycleNumber:1];
 
-		[self sendHoldTime:holdTime];
-        [self sendNumSamples:numSamples];
-		[self sendTempUnit:tempUnits countUnits:countUnits];
-		[self sendCountingTime:cycleDuration];
+		//On Start, push ALL ORCA settings to the machine (overwriting whatever is there),
+		//then begin the run so the counter always runs with ORCA's configuration.
+		[self writeSettingsToDevice];
         [self enqueueCmd:@"++Delay"];
-        
+
 		[self sendStart];
         [self enqueueCmd:@"++Delay"];
         [self startDataArrivalTimeout];
@@ -700,6 +813,8 @@ NSString* ORBt610Lock = @"ORBt610Lock";
         [self checkCycle];
 	}
 }
+
+
 
 - (void) stopCycle
 {
@@ -854,9 +969,45 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     [[NSNotificationCenter defaultCenter] postNotificationName:@"ORCouchDBAddObjectRecord" object:self userInfo:values];
 }
 
+//Continuous heartbeat: runs the whole time the port is open (independent of whether
+//ORCA started the run) so that starting/stopping or changing settings directly on the
+//machine is always reflected back into ORCA.
+- (void) pollDevice
+{
+    if([serialPort isOpen]){
+        //only poll run-state (start/stop from the machine + live counts). Settings are
+        //NEVER auto-synced — that happens only via the Sync Settings button.
+        if(!dumpInProgress){
+            [self probe];              //OP -> running/holding/stopped
+            [self getLastRecord];      //4 1 -> refresh the count table from the machine
+        }
+        //Floor the interval: a 0/unset pollTime would reschedule with afterDelay:0, creating a
+        //runaway loop that floods the command queue with OP probes and starves Start.
+        int delay = (pollTime > 0) ? pollTime : 5;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(pollDevice) object:nil];
+        [self performSelector:@selector(pollDevice) withObject:nil afterDelay:delay];
+    }
+}
+
+//read the machine's current settings back into ORCA (CU/TU -> units, ST -> start time,
+//SH -> hold time). Responses are parsed in -process_response:.
+- (void) readSettingsFromDevice
+{
+    if([serialPort isOpen]){
+        //Individual setting queries (device replies "<CMD> <value>", e.g. "SH 20", "CU 1-/L").
+        [self addCmdToQueue:@"CU"];   //count units
+        [self addCmdToQueue:@"TU"];   //temp units
+        [self getSampleTime];         //ST -> start/sample time
+        [self getHoldTime];           //SH -> hold time
+        [self addCmdToQueue:@"SN"];   //number of samples / mode
+        //Command "1" returns the identity report (serial #, firmware version).
+        [self getUnits];
+    }
+}
+
 - (void) checkCycle
 {
-	if([serialPort isOpen]){ 
+	if([serialPort isOpen]){
         if(!dumpInProgress)[self probe];
         [self cancelCycleCheck];
         [self performSelector:@selector(checkCycle) withObject:nil afterDelay:1];
@@ -925,7 +1076,21 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     theResponse = [theResponse stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     theResponse = [theResponse stringByTrimmingCharactersInSet:[NSCharacterSet controlCharacterSet]];
 	NSArray* partsByComma = [theResponse componentsSeparatedByString:@","];
-	if([partsByComma count] >= 14 && (![lastRequest hasPrefix:@"2"] && ![lastRequest hasPrefix:@"3"])){
+	if([partsByComma count] >= 14 && readingLastRecord){
+		//polled last-record read (command "4 1"): mirror ONLY the 6 count channels into the
+		//table. No temp/humidity, no CouchDB, no plot point, no cycle increment — this just
+		//keeps the count table in sync with the machine on every poll.
+		readingLastRecord = NO;
+		[self setMeasurementDate:[partsByComma objectAtIndex:0]];
+		[self setCount:0 value:[[partsByComma objectAtIndex:2] intValue]];
+		[self setCount:1 value:[[partsByComma objectAtIndex:4] intValue]];
+		[self setCount:2 value:[[partsByComma objectAtIndex:6] intValue]];
+		[self setCount:3 value:[[partsByComma objectAtIndex:8] intValue]];
+		[self setCount:4 value:[[partsByComma objectAtIndex:10] intValue]];
+		[self setCount:5 value:[[partsByComma objectAtIndex:12] intValue]];
+	}
+	else if([partsByComma count] >= 14 && (![lastRequest hasPrefix:@"2"] && ![lastRequest hasPrefix:@"3"])){
+		readingLastRecord = NO; //a genuine end-of-sample record supersedes any pending poll read
 		if(!dumpInProgress){
             [self setMeasurementDate:[partsByComma objectAtIndex:0]];
 			[self setCount:0 value:[[partsByComma objectAtIndex:2] intValue]];
@@ -946,7 +1111,20 @@ NSString* ORBt610Lock = @"ORBt610Lock";
             
             [self setMissedCycleCount:0];
             [self cancelDataArrivalTimeout];
-        
+
+            //add plot points ONLY here (at sample completion / Hold), not on every poll
+            {
+                int ch;
+                for(ch=0;ch<6;ch++){
+                    if(timeRates[ch] == nil) timeRates[ch] = [[ORTimeRate alloc] init];
+                    [timeRates[ch] addDataToTimeAverage:count[ch]];
+                }
+                if(timeRates[6] == nil) timeRates[6] = [[ORTimeRate alloc] init];
+                [timeRates[6] addDataToTimeAverage:temperature];
+                if(timeRates[7] == nil) timeRates[7] = [[ORTimeRate alloc] init];
+                [timeRates[7] addDataToTimeAverage:humidity];
+            }
+
             [self postCouchDBRecord];
             
             [self startDataArrivalTimeout];
@@ -979,13 +1157,33 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 			[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(dumpTimeout) object:nil];
 			[self performSelector:@selector(dumpTimeout) withObject:nil afterDelay:.5];
 		}
-		else if([theResponse hasPrefix:@"CU"]){
-			if([partsByComma count] == 2){
-				NSString* theUnits = [partsByComma objectAtIndex:1];
-				if([theUnits hasPrefix:@"CF"])[self setCountUnits:0];
-				else if([theUnits hasPrefix:@"/L"])[self setCountUnits:1];
-				else if([theUnits hasPrefix:@"TC"])[self setCountUnits:2];
+		else if([theResponse hasPrefix:@"SERIAL NUMBER"]){
+			//"1" report line: "SERIAL NUMBER, A15436"
+			NSRange r = [theResponse rangeOfString:@","];
+			if(r.location != NSNotFound){
+				[self setSerialNumber:[[theResponse substringFromIndex:r.location+1]
+									   stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
 			}
+		}
+		else if([theResponse hasPrefix:@"BT-610,"]){
+			//"1" report line: "BT-610, 81666-1, R1.1.2" -> software/firmware version = last field
+			NSArray* p = [theResponse componentsSeparatedByString:@","];
+			if([p count]>=3){
+				[self setSoftwareVersion:[[p lastObject]
+										 stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
+			}
+		}
+		else if([theResponse hasPrefix:@"CU"]){
+			//count units reply "CU 1-/L" (index-token). The leading number is the unit index.
+			NSString* u = [[theResponse substringFromIndex:2]
+						   stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@" ,\t"]];
+			if([u length]>0 && [[NSCharacterSet decimalDigitCharacterSet] characterIsMember:[u characterAtIndex:0]]){
+				[self setCountUnits:[u intValue]];
+			}
+			else if([u hasPrefix:@"CF"]) [self setCountUnits:0];
+			else if([u hasPrefix:@"/L"]) [self setCountUnits:1];
+			else if([u hasPrefix:@"TC"]) [self setCountUnits:2];
+			else if([u hasPrefix:@"M3"]) [self setCountUnits:3];
 		}
 		else if([theResponse hasPrefix:@"ST"]){
 			NSArray* partsBySpaces = [theResponse componentsSeparatedByString:@" "];
@@ -995,11 +1193,44 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 			}
 		}
 		else if([theResponse hasPrefix:@"TU"]){
+			//temp units reply "TU 1-F" (index-token). The leading number is the unit index.
+			NSString* u = [[theResponse substringFromIndex:2]
+						   stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@" ,\t"]];
+			if([u length]>0 && [[NSCharacterSet decimalDigitCharacterSet] characterIsMember:[u characterAtIndex:0]]){
+				[self setTempUnits:[u intValue]];
+			}
+			else if([u hasPrefix:@"F"]) [self setTempUnits:1];
+			else                        [self setTempUnits:0];
+		}
+		else if([theResponse hasPrefix:@"SH"]){
 			NSArray* partsBySpaces = [theResponse componentsSeparatedByString:@" "];
 			if([partsBySpaces count]==2){
 				NSString* st = [partsBySpaces objectAtIndex:1];
-				[self setTempUnits:[st intValue]];
+				[self setHoldTime:[st intValue]];
 			}
+		}
+		else if([theResponse hasPrefix:@"SN"]){
+			//number of samples / mode reply: "SN <n>" (0=Repeat). Read only on Sync.
+			NSArray* partsBySpaces = [theResponse componentsSeparatedByString:@" "];
+			if([partsBySpaces count]==2){
+				[self setNumSamples:[[partsBySpaces objectAtIndex:1] intValue]];
+			}
+		}
+		else if([theResponse hasPrefix:@"SS"] || [lastRequest isEqualToString:@"SS"]){
+			//serial number reply. In Computer Mode the device may omit the "SS" echo,
+			//so also match on lastRequest. Strip any "SS" prefix + comma/space separator.
+			NSString* sn = theResponse;
+			if([sn hasPrefix:@"SS"]) sn = [sn substringFromIndex:2];
+			sn = [sn stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@" ,\t"]];
+			[self setSerialNumber:sn];
+		}
+		else if([theResponse hasPrefix:@"RV"] || [lastRequest isEqualToString:@"RV"]){
+			//software revision reply. In Computer Mode the device may omit the "RV" echo,
+			//so also match on lastRequest. Strip any "RV" prefix + comma/space separator.
+			NSString* rv = theResponse;
+			if([rv hasPrefix:@"RV"]) rv = [rv substringFromIndex:2];
+			rv = [rv stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@" ,\t"]];
+			[self setSoftwareVersion:rv];
 		}
         else if([theResponse  isEqualToString:@"S"]){
             [self setRunning:YES];
@@ -1012,6 +1243,13 @@ NSString* ORBt610Lock = @"ORBt610Lock";
             if([partsBySpaces count]>1){
                 NSString* state = [partsBySpaces objectAtIndex:1];
                 if([state hasPrefix:@"R"]){ //running
+                    if(![self running]){
+                        //the counter was started directly on the machine: arm data handling
+                        //so particle counts start appearing. Settings are NOT auto-synced.
+                        [self setCycleNumber:1];
+                        [self startDataArrivalTimeout];
+                        [self checkCycle];
+                    }
                     [self setHolding:NO];
                     [self setRunning:YES];
                     if([partsBySpaces count]>2){

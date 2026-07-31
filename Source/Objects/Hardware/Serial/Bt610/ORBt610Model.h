@@ -19,6 +19,7 @@
 #pragma mark ***Imported Files
 #import "ORAdcProcessing.h"
 #import "ORSerialPortWithQueueModel.h"
+#import "ORInFluxDBModel.h"
 
 @class ORTimeRate;
 @class ORAlarm;
@@ -26,6 +27,7 @@
 #define kBt610CmdTimeout           2
 #define kBt610DelayTime            0.1
 #define kBt610ProbeTime            13
+//#define kBt610PollTime             5
 
 @interface ORBt610Model : ORSerialPortWithQueueModel <ORAdcProcessing>
 {
@@ -38,7 +40,7 @@
 		float			countAlarmLimit[8];
 		int				numSamples;
 		int				cycleDuration;
-
+        int             pollTime;
         BOOL            running;
         BOOL            holding;
         NSString*       opTimer;
@@ -47,6 +49,8 @@
 		BOOL			wasRunning;
 		int				actualDuration;
         NSString*       measurementDate;
+        NSString*       serialNumber;
+        NSString*       softwareVersion;
 
 		float			temperature;
 		float			humidity;
@@ -67,6 +71,7 @@
 		BOOL			sentStartOnce;
 		BOOL			sentStopOnce;
         int             missedCycleCount;
+        BOOL            readingLastRecord;
 }
 
 
@@ -84,7 +89,9 @@
 - (BOOL) isLog;
 - (void) setIsLog:(BOOL)aIsLog;
 - (int) holdTime;
+- (int) pollTime;
 - (void) setHoldTime:(int)aHoldTime;
+- (void) setPollTime:(int)aPollTime;
 - (void) setOpTimer:(NSString*)aValue;
 - (NSString*) opTimer;
 - (int) tempUnits;
@@ -103,6 +110,10 @@
 - (void) setActualDuration:(int)aActualDuration;
 - (NSString*) measurementDate;
 - (void) setMeasurementDate:(NSString*)aMeasurementDate;
+- (NSString*) serialNumber;
+- (void) setSerialNumber:(NSString*)aSerialNumber;
+- (NSString*) softwareVersion;
+- (void) setSoftwareVersion:(NSString*)aSoftwareVersion;
 - (ORTimeRate*)timeRate:(int)index;
 - (int) cycleNumber;
 - (void) setCycleNumber:(int)aCycleNumber;
@@ -130,6 +141,8 @@
 - (void) startCycle:(BOOL)force;
 - (void) startCycle;
 - (void) stopCycle;
+- (void) pollDevice;
+- (void) readSettingsFromDevice;
 
 #pragma mark ***Commands
 - (void) sendAllData;
@@ -141,13 +154,21 @@
 - (void) getSampleTime;
 - (void) getLocation;
 - (void) getHoldTime;
-- (void) getUnits;	
+- (void) getUnits;
+- (void) getSerialNumber;
+- (void) getSoftwareVersion;
+- (void) getLastRecord;
 - (void) sendCountingTime:(int)aValue;
 - (void) sendNumSamples:(int)aValue;
 - (void) sendID:(int)aValue;
 - (void) sendHoldTime:(int)aValue;
 - (void) sendTempUnit:(int)aTempUnit countUnits:(int)aCountUnit;
+- (void) sendCountUnits:(int)aCountUnit;
+- (void) sendTempUnits:(int)aTempUnit;
+- (void) writeSettingsToDevice;
 - (void) probe;
+- (void) probeModel;
+- (void) printModelSummary;
 
 #pragma mark •••Adc Processing Protocol
 - (void)processIsStarting;
@@ -191,6 +212,8 @@ extern NSString* ORBt610ModelPollTimeChanged;
 extern NSString* ORBt610ModelMissedCountChanged;
 extern NSString* ORBt610ModelOpTimerChanged;
 extern NSString* ORBt610ModelMeasurementDateChanged;
+extern NSString* ORBt610ModelSerialNumberChanged;
+extern NSString* ORBt610ModelSoftwareVersionChanged;
 
 extern NSString* ORBt610Lock;
 
