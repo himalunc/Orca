@@ -101,7 +101,7 @@
 	aPlot = [[ORTimeLinePlot alloc] initWithTag:5 andDataSource:self];
 	[plotter0 addPlot: aPlot];
 	[aPlot setLineColor:[NSColor orangeColor]];
-	[aPlot setName:@"5.0 µm"];
+	[aPlot setName:@"3.0 µm"];
 	[aPlot release];
 
 	aPlot = [[ORTimeLinePlot alloc] initWithTag:6 andDataSource:self];

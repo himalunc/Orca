@@ -799,7 +799,8 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 	if((![self running] || force) && [serialPort isOpen]){
 		[self sendEnd];
         [self enqueueCmd:@"++Delay"];
-		[self setCycleNumber:1];
+		[self setCycleNumber:0];   //first counting cycle will bump this to 1 (see OP handler)
+		wasCounting = NO;
 
 		//On Start, push ALL ORCA settings to the machine (overwriting whatever is there),
 		//then begin the run so the counter always runs with ORCA's configuration.
@@ -969,6 +970,43 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     [[NSNotificationCenter defaultCenter] postNotificationName:@"ORCouchDBAddObjectRecord" object:self userInfo:values];
 }
 
+//Send the completed measurement to InfluxDB (mirrors PMS31 -sendPMS31ToInfluxDBnPlot).
+//Called ONLY at sample completion, so one record is sent per finished measurement.
+- (void) sendToInfluxDB
+{
+    @autoreleasepool {
+        @try {
+            InFluxDB = [[[(ORAppDelegate*)[NSApp delegate] document] findObjectWithFullID:@"ORInFluxDBModel,1"] retain];
+            if(InFluxDB == nil) return; //InfluxDB object not in config — nothing to send
+
+            double currentTimeStamp = [[NSDate date] timeIntervalSince1970];
+            ORInFluxDBMeasurement* measurement = [ORInFluxDBMeasurement measurementForBucket:@"ENAP_SC_UNC" org:[InFluxDB org]];
+
+            [measurement start:@"BT610_ParticleCounts"];
+            [measurement addTag:@"unit" withString:[NSString stringWithFormat:@"%u",[self uniqueIdNumber]]];
+            [measurement addTag:@"mode" withString:[self countingModeString]];
+
+            NSArray* channelNames = @[@"0.3um",@"0.5um",@"0.7um",@"1.0um",@"2.0um",@"3.0um"];
+            int i;
+            for(i=0;i<6;i++){
+                [measurement addField:[channelNames objectAtIndex:i] withLong:(long)[self count:i]];
+            }
+            [measurement addField:@"temperature" withDouble:temperature];
+            [measurement addField:@"humidity"    withDouble:humidity];
+
+            [measurement setTimeStamp:currentTimeStamp];
+            [InFluxDB executeDBCmd:measurement];
+            [InFluxDB release];
+            InFluxDB = nil;
+        }
+        @catch (NSException* exception) {
+            NSLog(@"Bt610(%d): InfluxDB error: %@\n",[self uniqueIdNumber],[exception reason]);
+            [InFluxDB release];
+            InFluxDB = nil;
+        }
+    }
+}
+
 //Continuous heartbeat: runs the whole time the port is open (independent of whether
 //ORCA started the run) so that starting/stopping or changing settings directly on the
 //machine is always reflected back into ORCA.
@@ -979,7 +1017,6 @@ NSString* ORBt610Lock = @"ORBt610Lock";
         //NEVER auto-synced — that happens only via the Sync Settings button.
         if(!dumpInProgress){
             [self probe];              //OP -> running/holding/stopped
-            [self getLastRecord];      //4 1 -> refresh the count table from the machine
         }
         //Floor the interval: a 0/unset pollTime would reschedule with afterDelay:0, creating a
         //runaway loop that floods the command queue with OP probes and starves Start.
@@ -1076,21 +1113,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     theResponse = [theResponse stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     theResponse = [theResponse stringByTrimmingCharactersInSet:[NSCharacterSet controlCharacterSet]];
 	NSArray* partsByComma = [theResponse componentsSeparatedByString:@","];
-	if([partsByComma count] >= 14 && readingLastRecord){
-		//polled last-record read (command "4 1"): mirror ONLY the 6 count channels into the
-		//table. No temp/humidity, no CouchDB, no plot point, no cycle increment — this just
-		//keeps the count table in sync with the machine on every poll.
-		readingLastRecord = NO;
-		[self setMeasurementDate:[partsByComma objectAtIndex:0]];
-		[self setCount:0 value:[[partsByComma objectAtIndex:2] intValue]];
-		[self setCount:1 value:[[partsByComma objectAtIndex:4] intValue]];
-		[self setCount:2 value:[[partsByComma objectAtIndex:6] intValue]];
-		[self setCount:3 value:[[partsByComma objectAtIndex:8] intValue]];
-		[self setCount:4 value:[[partsByComma objectAtIndex:10] intValue]];
-		[self setCount:5 value:[[partsByComma objectAtIndex:12] intValue]];
-	}
-	else if([partsByComma count] >= 14 && (![lastRequest hasPrefix:@"2"] && ![lastRequest hasPrefix:@"3"])){
-		readingLastRecord = NO; //a genuine end-of-sample record supersedes any pending poll read
+	if([partsByComma count] >= 14 && (![lastRequest hasPrefix:@"2"] && ![lastRequest hasPrefix:@"3"])){
 		if(!dumpInProgress){
             [self setMeasurementDate:[partsByComma objectAtIndex:0]];
 			[self setCount:0 value:[[partsByComma objectAtIndex:2] intValue]];
@@ -1126,11 +1149,12 @@ NSString* ORBt610Lock = @"ORBt610Lock";
             }
 
             [self postCouchDBRecord];
-            
+            [self sendToInfluxDB]; //send one InfluxDB record per finished measurement
+
             [self startDataArrivalTimeout];
-            int theCount = [self cycleNumber];
-            [self setCycleNumber:theCount+1];
-			
+            //NOTE: cycle number is incremented when the NEXT counting begins (Hold->Running
+            //transition in the OP handler below), not here at sample completion.
+
             [self probe];
 		}
 		else {
@@ -1242,27 +1266,31 @@ NSString* ORBt610Lock = @"ORBt610Lock";
             NSArray* partsBySpaces = [theResponse componentsSeparatedByString:@" "];
             if([partsBySpaces count]>1){
                 NSString* state = [partsBySpaces objectAtIndex:1];
-                if([state hasPrefix:@"R"]){ //running
-                    if(![self running]){
-                        //the counter was started directly on the machine: arm data handling
-                        //so particle counts start appearing. Settings are NOT auto-synced.
-                        [self setCycleNumber:1];
+                if([state hasPrefix:@"R"]){ //counting
+                    if(!wasCounting){
+                        //transition INTO counting -> a new counting cycle is starting.
+                        //(In Repeat mode the idle between counts reports S/H, so this fires
+                        //once per counting cycle and is never reset to 1 mid-run.)
+                        [self setCycleNumber:[self cycleNumber]+1];
                         [self startDataArrivalTimeout];
                         [self checkCycle];
                     }
+                    wasCounting = YES;
                     [self setHolding:NO];
                     [self setRunning:YES];
                     if([partsBySpaces count]>2){
                         [self setOpTimer:[partsBySpaces objectAtIndex:2]];
                     }
                 }
-                else if([state hasPrefix:@"H"]){ //holding
+                else if([state hasPrefix:@"H"]){ //holding (idle between counts)
+                    wasCounting = NO;
                     [self setHolding:YES];
                     if([partsBySpaces count]>2){
                         [self setOpTimer:[partsBySpaces objectAtIndex:2]];
                     }
                 }
-                else if([state hasPrefix:@"S"]){ //stopped
+                else if([state hasPrefix:@"S"]){ //stopped / idle between counts
+                    wasCounting = NO;
                     [self setRunning:NO];
                     [self setHolding:NO];
                     [self setOpTimer:@""];

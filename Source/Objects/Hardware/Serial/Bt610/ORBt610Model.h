@@ -72,6 +72,8 @@
 		BOOL			sentStopOnce;
         int             missedCycleCount;
         BOOL            readingLastRecord;
+        BOOL            wasCounting;
+        ORInFluxDBModel* InFluxDB;
 }
 
 
@@ -169,6 +171,7 @@
 - (void) probe;
 - (void) probeModel;
 - (void) printModelSummary;
+- (void) sendToInfluxDB;
 
 #pragma mark •••Adc Processing Protocol
 - (void)processIsStarting;

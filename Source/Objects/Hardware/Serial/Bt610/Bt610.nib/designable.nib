@@ -206,9 +206,9 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="vca-Np-X7S">
-                                                        <rect key="frame" x="107" y="153" width="42" height="19"/>
+                                                        <rect key="frame" x="107" y="153" width="42" height="22"/>
                                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                        <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" drawsBackground="YES" id="gby-iF-2wR">
+                                                        <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" title="20" drawsBackground="YES" id="gby-iF-2wR">
                                                             <font key="font" metaFont="smallSystem"/>
                                                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -267,9 +267,9 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="jip-9M-002">
-                                                        <rect key="frame" x="118" y="239" width="42" height="19"/>
+                                                        <rect key="frame" x="118" y="239" width="42" height="22"/>
                                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                        <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" drawsBackground="YES" id="Zse-4x-9d7">
+                                                        <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" title="60" drawsBackground="YES" id="Zse-4x-9d7">
                                                             <font key="font" metaFont="smallSystem"/>
                                                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -414,22 +414,22 @@
                                                                     <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                     <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                                 </textFieldCell>
-                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="1.0 µm" id="Fa4-tb-yVe">
+                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="0.7 µm" id="Fa4-tb-yVe">
                                                                     <font key="font" metaFont="smallSystem"/>
                                                                     <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                     <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                                 </textFieldCell>
-                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="2.0µm" id="9zW-PX-yKn">
+                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="1.0µm" id="9zW-PX-yKn">
                                                                     <font key="font" metaFont="smallSystem"/>
                                                                     <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                     <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                                 </textFieldCell>
-                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="5.0µm" id="gG8-KH-qua">
+                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="2.0µm" id="gG8-KH-qua">
                                                                     <font key="font" metaFont="smallSystem"/>
                                                                     <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                     <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                                 </textFieldCell>
-                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="10.0µm" id="yb4-tG-jBZ">
+                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" title="3.0µm" id="yb4-tG-jBZ">
                                                                     <font key="font" metaFont="smallSystem"/>
                                                                     <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                     <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
@@ -700,7 +700,7 @@
                                             </connections>
                                         </button>
                                         <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="1Ga-2C-Rkz">
-                                            <rect key="frame" x="299" y="413" width="96" height="22"/>
+                                            <rect key="frame" x="299" y="413" width="19" height="22"/>
                                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                             <textFieldCell key="cell" controlSize="small" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" title="5" drawsBackground="YES" id="gLo-Rf-UoH">
                                                 <font key="font" metaFont="smallSystem"/>
@@ -722,7 +722,21 @@
                                                 <action selector="readSerialNumberAction:" target="-2" id="5La-nu-gQI"/>
                                             </connections>
                                         </button>
+                                        <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Yzq-fz-vDd">
+                                            <rect key="frame" x="362" y="418" width="60" height="14"/>
+                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                            <buttonCell key="cell" type="check" title="verbose" bezelStyle="regularSquare" imagePosition="left" controlSize="small" state="on" inset="2" id="fbq-UD-WUn">
+                                                <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                <font key="font" metaFont="smallSystem"/>
+                                            </buttonCell>
+                                        </button>
                                     </subviews>
+                                </view>
+                            </tabViewItem>
+                            <tabViewItem label="Advanced Setting" identifier="1" id="Kcr-5a-hLa" userLabel="Advanced">
+                                <view key="view" id="LCA-va-Am5">
+                                    <rect key="frame" x="10" y="25" width="419" height="435"/>
+                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 </view>
                             </tabViewItem>
                             <tabViewItem label="Process Limits" identifier="2" id="Qys-Dy-Q1C">
@@ -836,7 +850,7 @@
                                                                     <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                     <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                                 </textFieldCell>
-                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="right" title="5.0um" id="jO0-xt-QK6">
+                                                                <textFieldCell controlSize="small" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="right" title="3.0um" id="jO0-xt-QK6">
                                                                     <font key="font" metaFont="smallSystem"/>
                                                                     <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                     <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
@@ -1034,7 +1048,7 @@
             <connections>
                 <outlet property="delegate" destination="-2" id="61"/>
             </connections>
-            <point key="canvasLocation" x="37" y="-132"/>
+            <point key="canvasLocation" x="134" y="-82"/>
         </window>
         <customObject id="2285" userLabel="Serial Port Controller" customClass="ORSerialPortController">
             <connections>
