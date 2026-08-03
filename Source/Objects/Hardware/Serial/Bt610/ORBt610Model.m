@@ -52,6 +52,7 @@ NSString* ORBt610ModelOpTimerChanged            = @"ORBt610ModelOpTimerChanged";
 NSString* ORBt610ModelMeasurementDateChanged    = @"ORBt610ModelMeasurementDateChanged";
 NSString* ORBt610ModelSerialNumberChanged       = @"ORBt610ModelSerialNumberChanged";
 NSString* ORBt610ModelSoftwareVersionChanged    = @"ORBt610ModelSoftwareVersionChanged";
+NSString* ORBt610ModelChannelSizesChanged       = @"ORBt610ModelChannelSizesChanged";
 
 NSString* ORBt610Lock = @"ORBt610Lock";
 
@@ -95,6 +96,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     [measurementDate release];
     [serialNumber release];
     [softwareVersion release];
+    {int ci; for(ci=0;ci<6;ci++) [channelSize[ci] release];}
 
 	int i;
 	for(i=0;i<8;i++){
@@ -621,6 +623,22 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 	else return 0;
 }
 
+- (NSString*) channelSize:(int)index
+{
+	if(index>=0 && index<6 && channelSize[index]) return channelSize[index];
+	else return @"";
+}
+
+- (void) setChannelSize:(int)index value:(NSString*)aValue
+{
+	if(index>=0 && index<6){
+		[aValue retain];
+		[channelSize[index] release];
+		channelSize[index] = aValue;
+		[[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelChannelSizesChanged object:self];
+	}
+}
+
 - (void) setUpPort
 {
 	[serialPort setSpeed:9600];
@@ -723,6 +741,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 - (void) getSerialNumber            { [self addCmdToQueue:@"SS"]; }
 - (void) getSoftwareVersion         { [self addCmdToQueue:@"RV"]; }
 - (void) getLastRecord              { readingLastRecord = YES; [self addCmdToQueue:@"4 1"]; } //last 1 record -> refresh count table
+- (void) getChannelSizes            { [self addCmdToQueue:@"RZ"]; } //returns channel size list
 
 - (void) sendNumSamples:(int)aValue { [self addCmdToQueue:[NSString stringWithFormat:@"SN %d",aValue]]; }
 - (void) sendCountingTime:(int)aValue { [self addCmdToQueue:[NSString stringWithFormat:@"ST %d",aValue]]; }
@@ -805,6 +824,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 		//On Start, push ALL ORCA settings to the machine (overwriting whatever is there),
 		//then begin the run so the counter always runs with ORCA's configuration.
 		[self writeSettingsToDevice];
+		[self getChannelSizes];   //refresh channel sizes so plot/InfluxDB names are current
         [self enqueueCmd:@"++Delay"];
 
 		[self sendStart];
@@ -986,10 +1006,14 @@ NSString* ORBt610Lock = @"ORBt610Lock";
             [measurement addTag:@"unit" withString:[NSString stringWithFormat:@"%u",[self uniqueIdNumber]]];
             [measurement addTag:@"mode" withString:[self countingModeString]];
 
-            NSArray* channelNames = @[@"0.3um",@"0.5um",@"0.7um",@"1.0um",@"2.0um",@"3.0um"];
+            //channel field names come from the device (RZ) rather than being hardcoded
+            NSArray* fallbackNames = @[@"0.3um",@"0.5um",@"0.7um",@"1.0um",@"2.5um",@"5.0um"];
             int i;
             for(i=0;i<6;i++){
-                [measurement addField:[channelNames objectAtIndex:i] withLong:(long)[self count:i]];
+                NSString* sz = [self channelSize:i];
+                NSString* fieldName = ([sz length]>0) ? [NSString stringWithFormat:@"%@um",sz]
+                                                       : [fallbackNames objectAtIndex:i];
+                [measurement addField:fieldName withLong:(long)[self count:i]];
             }
             [measurement addField:@"temperature" withDouble:temperature];
             [measurement addField:@"humidity"    withDouble:humidity];
@@ -1037,6 +1061,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
         [self getSampleTime];         //ST -> start/sample time
         [self getHoldTime];           //SH -> hold time
         [self addCmdToQueue:@"SN"];   //number of samples / mode
+        [self getChannelSizes];       //RZ -> channel size list
         //Command "1" returns the identity report (serial #, firmware version).
         [self getUnits];
     }
@@ -1151,7 +1176,10 @@ NSString* ORBt610Lock = @"ORBt610Lock";
             [self postCouchDBRecord];
             [self sendToInfluxDB]; //send one InfluxDB record per finished measurement
 
-            [self startDataArrivalTimeout];
+            //Only re-arm the data-arrival watchdog in Repeat mode (numSamples==0), where more
+            //records are expected. In Single/N-sample mode the device stops after the last
+            //sample, so re-arming would fire doCycleKick and raise a false "missing cycles" alarm.
+            if(numSamples==0) [self startDataArrivalTimeout];
             //NOTE: cycle number is incremented when the NEXT counting begins (Hold->Running
             //transition in the OP handler below), not here at sample completion.
 
@@ -1255,6 +1283,16 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 			if([rv hasPrefix:@"RV"]) rv = [rv substringFromIndex:2];
 			rv = [rv stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@" ,\t"]];
 			[self setSoftwareVersion:rv];
+		}
+		else if([partsByComma count]==2){
+			//channel size line "01, 0.3" (from RZ, and from the "1" report): "<chNum 1-6>, <size>".
+			//Guard tightly: first field must be a 1-2 digit integer 1..6 with no decimal point.
+			NSString* f0 = [[partsByComma objectAtIndex:0] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+			int chNum = [f0 intValue];
+			if(chNum>=1 && chNum<=6 && [f0 length]<=2 && [f0 rangeOfString:@"."].location==NSNotFound){
+				NSString* size = [[partsByComma objectAtIndex:1] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+				[self setChannelSize:chNum-1 value:size];
+			}
 		}
         else if([theResponse  isEqualToString:@"S"]){
             [self setRunning:YES];

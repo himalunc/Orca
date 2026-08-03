@@ -36,6 +36,7 @@
         NSMutableString* buffer;
 		ORTimeRate*		timeRates[8];
 		int				count[6];
+		NSString*		channelSize[6];
 		float			maxCounts[8];
 		float			countAlarmLimit[8];
 		int				numSamples;
@@ -131,6 +132,8 @@
 - (void) setNumSamples:(int)aValue;
 - (void) setCount:(int)index value:(int)aValue;
 - (int) count:(int)index;
+- (NSString*) channelSize:(int)index;
+- (void) setChannelSize:(int)index value:(NSString*)aValue;
 - (NSString*) countingModeString;
 - (float) countAlarmLimit:(int)index;
 - (void) setIndex:(int)index countAlarmLimit:(float)aCountAlarmLimit;
@@ -160,6 +163,7 @@
 - (void) getSerialNumber;
 - (void) getSoftwareVersion;
 - (void) getLastRecord;
+- (void) getChannelSizes;
 - (void) sendCountingTime:(int)aValue;
 - (void) sendNumSamples:(int)aValue;
 - (void) sendID:(int)aValue;
@@ -217,6 +221,7 @@ extern NSString* ORBt610ModelOpTimerChanged;
 extern NSString* ORBt610ModelMeasurementDateChanged;
 extern NSString* ORBt610ModelSerialNumberChanged;
 extern NSString* ORBt610ModelSoftwareVersionChanged;
+extern NSString* ORBt610ModelChannelSizesChanged;
 
 extern NSString* ORBt610Lock;
 

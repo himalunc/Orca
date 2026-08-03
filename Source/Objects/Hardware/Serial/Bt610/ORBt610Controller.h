@@ -42,6 +42,7 @@
     IBOutlet NSTextField*   cycleTypeField;
 
 	IBOutlet NSMatrix*		countMatrix;
+	IBOutlet NSMatrix*		channelSizeMatrix;
 
     IBOutlet NSButton*      lockButton;
     IBOutlet NSButton*      clearAllButton;
@@ -90,6 +91,7 @@
 #pragma mark ***Interface Management
 - (void) measurementDateChanged:(NSNotification*)aNote;
 - (void) serialNumberChanged:(NSNotification*)aNote;
+- (void) channelSizesChanged:(NSNotification*)aNote;
 - (void) softwareVersionChanged:(NSNotification*)aNote;
 - (void) opTimerChanged:(NSNotification*)aNote;
 - (void) dumpCountChanged:(NSNotification*)aNote;

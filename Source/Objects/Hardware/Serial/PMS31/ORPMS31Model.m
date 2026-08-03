@@ -492,7 +492,8 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
 {
     if(index>=0 && index<kPMS31NumChannels){
         count[index] = aValue;
-        [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountChanged object:self];
+        //NOTE: the count TABLE is refreshed only at hold (see -sendPMS31ToInfluxDBnPlot),
+        //to match the History plot. Live polling stores values here without notifying.
     }
 }
 
@@ -815,6 +816,9 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
             if(timeRates[i] == nil) timeRates[i] = [[ORTimeRate alloc] init];
             [timeRates[i] addDataToTimeAverage:[self count:i]];
         }
+
+        //refresh the basic-operation count TABLE here (at hold), matching the plot cadence
+        [[NSNotificationCenter defaultCenter] postNotificationName:ORPMS31ModelCountChanged object:self];
 
         // Send to InfluxDB if available — wrapped in @try/@catch so InfluxDB
         // failures never prevent the plot from updating

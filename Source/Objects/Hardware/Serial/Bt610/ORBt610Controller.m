@@ -328,6 +328,11 @@
                          name : ORBt610ModelSoftwareVersionChanged
                         object: model];
 
+    [notifyCenter addObserver : self
+                     selector : @selector(channelSizesChanged:)
+                         name : ORBt610ModelChannelSizesChanged
+                        object: model];
+
 	[serialPortController registerNotificationObservers];
 	
 }
@@ -343,6 +348,7 @@
     [self measurementDateChanged:nil];
     [self serialNumberChanged:nil];
     [self softwareVersionChanged:nil];
+    [self channelSizesChanged:nil];
 	[self runningChanged:nil];
 	[self cycleStartedChanged:nil];
 	[self cycleNumberChanged:nil];
@@ -376,6 +382,26 @@
 - (void) softwareVersionChanged:(NSNotification*)aNote
 {
     [softwareVersionField setStringValue: [model softwareVersion]];
+}
+
+- (void) channelSizesChanged:(NSNotification*)aNote
+{
+    //Populate the channel-size matrix and the plot legends from the device (RZ) instead of
+    //hardcoded sizes. Use [matrix cells] (row-major) so it works regardless of whether the
+    //matrix is laid out as rows or columns.
+    NSArray* cells = [channelSizeMatrix cells];
+    int i;
+    for(i=0;i<6;i++){
+        NSString* sz = [model channelSize:i];
+        if(i < (int)[cells count]) [[cells objectAtIndex:i] setStringValue:sz];
+        if([sz length]>0){
+            [(ORTimeLinePlot*)[plotter0 plotWithTag:i] setName:[NSString stringWithFormat:@"%@ µm",sz]];
+        }
+    }
+    [channelSizeMatrix setNeedsDisplay:YES];
+    //setName: only stores the name; force the legend to re-lay-out with the new names
+    [plotter0 setShowLegend:YES];
+    [plotter0 setNeedsDisplay:YES];
 }
 
 - (void) measurementDateChanged:(NSNotification*)aNote
