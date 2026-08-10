@@ -1041,6 +1041,15 @@ NSString* ORPMS31Lock = @"ORPMS31Lock";
     }
 }
 
+//Suppress the "Serial Port Timeout" connection alarm. Command timeouts (e.g. when the port
+//is closed or the device is briefly unresponsive) should not raise an alarm; polling keeps
+//retrying and recovers automatically when the device responds again.
+- (void) postTimeoutAlarm
+{
+    [self clearTimeoutAlarm];
+    [self setTimeoutCount:0];
+}
+
 @end
 
 @implementation ORPMS31Model (private)

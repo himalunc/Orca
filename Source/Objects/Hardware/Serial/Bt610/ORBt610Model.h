@@ -62,6 +62,7 @@
 		BOOL			probing;
 		int				holdTime;
 		BOOL			isLog;
+		BOOL			verbose;
 		BOOL			dumpInProgress;
 		int				dumpCount;
 		ORAlarm*		sensorErrorAlarm;
@@ -91,6 +92,8 @@
 - (void) setDumpInProgress:(BOOL)aDumpInProgress;
 - (BOOL) isLog;
 - (void) setIsLog:(BOOL)aIsLog;
+- (BOOL) verbose;
+- (void) setVerbose:(BOOL)aVerbose;
 - (int) holdTime;
 - (int) pollTime;
 - (void) setHoldTime:(int)aHoldTime;
@@ -164,6 +167,7 @@
 - (void) getSoftwareVersion;
 - (void) getLastRecord;
 - (void) getChannelSizes;
+- (void) sendChannelSizes;
 - (void) sendCountingTime:(int)aValue;
 - (void) sendNumSamples:(int)aValue;
 - (void) sendID:(int)aValue;
@@ -199,6 +203,7 @@
 extern NSString* ORBt610ModelDumpCountChanged;
 extern NSString* ORBt610ModelDumpInProgressChanged;
 extern NSString* ORBt610ModelIsLogChanged;
+extern NSString* ORBt610ModelVerboseChanged;
 extern NSString* ORBt610ModelHoldTimeChanged;
 extern NSString* ORBt610ModelTempUnitsChanged;
 extern NSString* ORBt610ModelCountUnitsChanged;

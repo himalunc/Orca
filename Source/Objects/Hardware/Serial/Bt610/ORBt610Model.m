@@ -26,10 +26,15 @@
 #import "ORTimeRate.h"
 #import "ORAlarm.h"
 
+//Gated logging: per request, log ONLY when verbose is OFF (verbose ON = quiet).
+//Usable inside instance methods (references the 'verbose' ivar and 'self').
+#define BTVLOG(...) do{ if(!verbose) NSLog(__VA_ARGS__); }while(0)
+
 #pragma mark ***External Strings
 NSString* ORBt610ModelDumpCountChanged		    = @"ORBt610ModelDumpCountChanged";
 NSString* ORBt610ModelDumpInProgressChanged     = @"ORBt610ModelDumpInProgressChanged";
 NSString* ORBt610ModelIsLogChanged			    = @"ORBt610ModelIsLogChanged";
+NSString* ORBt610ModelVerboseChanged		    = @"ORBt610ModelVerboseChanged";
 NSString* ORBt610ModelHoldTimeChanged		    = @"ORBt610ModelHoldTimeChanged";
 NSString* ORBt610ModelPollTimeChanged            = @"ORBt610ModelPollTimeChanged";
 NSString* ORBt610ModelTempUnitsChanged		    = @"ORBt610ModelTempUnitsChanged";
@@ -245,6 +250,18 @@ NSString* ORBt610Lock = @"ORBt610Lock";
     [[[self undoManager] prepareWithInvocationTarget:self] setIsLog:isLog];
     isLog = aIsLog;
     [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelIsLogChanged object:self];
+}
+
+- (BOOL) verbose
+{
+    return verbose;
+}
+
+- (void) setVerbose:(BOOL)aVerbose
+{
+    [[[self undoManager] prepareWithInvocationTarget:self] setVerbose:verbose];
+    verbose = aVerbose;
+    [[NSNotificationCenter defaultCenter] postNotificationName:ORBt610ModelVerboseChanged object:self];
 }
 
 - (int) holdTime
@@ -649,9 +666,20 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 
 - (void) firstActionAfterOpeningPort
 {
-	//only start the run-state heartbeat. Settings/serial number are read only when the
-	//user clicks Sync Settings — nothing is auto-synced on connect.
+	//read the channel sizes once when the port opens (the "1" report carries the parseable
+	//"01, 0.3" lines) so the 610 GUI (size matrix, plot legends) and InfluxDB names are set.
+	[self getUnits];
+	//start the run-state heartbeat. Other settings are read only via the Sync button.
 	[self pollDevice];
+}
+
+//Suppress the "Serial Port Timeout" connection alarm. The heartbeat keeps polling and
+//recovers automatically when the device responds again, so command timeouts (e.g. when the
+//port is closed or the device is briefly unresponsive) should not raise an alarm.
+- (void) postTimeoutAlarm
+{
+	[self clearTimeoutAlarm];
+	[self setTimeoutCount:0];
 }
 
 #pragma mark ***Archival
@@ -660,6 +688,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 	self = [super initWithCoder:decoder];
 	[[self undoManager] disableUndoRegistration];
 	[self setIsLog:				[decoder decodeBoolForKey:@"isLog"]];
+	[self setVerbose:			[decoder decodeBoolForKey:@"verbose"]];
 	[self setHoldTime:			[decoder decodeIntForKey:   @"holdTime"]];
     [self setPollTime:          [decoder decodeIntForKey:   @"pollTime"]];
 	[self setTempUnits:			[decoder decodeIntForKey:   @"tempUnits"]];
@@ -684,6 +713,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 {
     [super encodeWithCoder:encoder];
     [encoder encodeBool:	isLog			forKey: @"isLog"];
+    [encoder encodeBool:	verbose			forKey: @"verbose"];
     [encoder encodeInteger:	holdTime		forKey: @"holdTime"];
     [encoder encodeInteger: pollTime        forKey: @"pollTime"];
     [encoder encodeInteger:	tempUnits		forKey: @"tempUnits"];
@@ -702,18 +732,14 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 #pragma mark *** Commands
 - (void) sendNewData
 {
-	if([serialPort isOpen]){
-		NSLog(@"Bt610 (%d): Starting dump of new data since last dump\n",[self uniqueIdNumber]);
-	}
-	[self addCmdToQueue:@"3"]; 
+	BTVLOG(@"Bt610(%d) action: dump new data (3)\n",[self uniqueIdNumber]);
+	[self addCmdToQueue:@"3"];
 }
 
-- (void) sendAllData 
-{ 
-	if([serialPort isOpen]){
-		NSLog(@"Bt610 (%d): Starting dump of all data\n",[self uniqueIdNumber]);
-	}
-	[self addCmdToQueue:@"2"]; 
+- (void) sendAllData
+{
+	BTVLOG(@"Bt610(%d) action: dump all data (2)\n",[self uniqueIdNumber]);
+	[self addCmdToQueue:@"2"];
 }
 
 - (void) setDate
@@ -728,30 +754,46 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 	NSCalendar *gregorian = [[[NSCalendar alloc]  initWithCalendarIdentifier:NSGregorianCalendar] autorelease];
 #endif
 	NSDateComponents *comps = [gregorian components:unitFlags fromDate:today];
+	BTVLOG(@"Bt610(%d) action: set date/time (D/T)\n",[self uniqueIdNumber]);
 	[self addCmdToQueue:[NSString stringWithFormat:@"D %02ld/%02ld/%02ld",[comps month],[comps day],[comps year]-2000]];
 	[self addCmdToQueue:[NSString stringWithFormat:@"T %02ld:%02ld",[comps hour],[comps minute]]];
 }
-- (void) sendClearData				{ [self addCmdToQueue:@"C\rY"]; }
-- (void) sendStart					{ [self addCmdToQueue:@"S"]; }
-- (void) sendEnd					{ [self addCmdToQueue:@"E"]; }
-- (void) getSampleTime				{ [self addCmdToQueue:@"ST"]; }
-- (void) getLocation				{ [self addCmdToQueue:@"ID"]; }
-- (void) getHoldTime                { [self addCmdToQueue:@"SH"]; }
-- (void) getUnits                   { [self addCmdToQueue:@"1"]; }
-- (void) getSerialNumber            { [self addCmdToQueue:@"SS"]; }
-- (void) getSoftwareVersion         { [self addCmdToQueue:@"RV"]; }
-- (void) getLastRecord              { readingLastRecord = YES; [self addCmdToQueue:@"4 1"]; } //last 1 record -> refresh count table
-- (void) getChannelSizes            { [self addCmdToQueue:@"RZ"]; } //returns channel size list
+- (void) sendClearData				{ BTVLOG(@"Bt610(%d) action: clear data\n",[self uniqueIdNumber]); [self addCmdToQueue:@"C\rY"]; }
+- (void) sendStart					{ BTVLOG(@"Bt610(%d) action: send Start (S)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"S"]; }
+- (void) sendEnd					{ BTVLOG(@"Bt610(%d) action: send End (E)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"E"]; }
+- (void) getSampleTime				{ BTVLOG(@"Bt610(%d) action: get sample time (ST)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"ST"]; }
+- (void) getLocation				{ BTVLOG(@"Bt610(%d) action: get location (ID)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"ID"]; }
+- (void) getHoldTime                { BTVLOG(@"Bt610(%d) action: get hold time (SH)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"SH"]; }
+- (void) getUnits                   { BTVLOG(@"Bt610(%d) action: get units/settings report (1)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"1"]; }
+- (void) getSerialNumber            { BTVLOG(@"Bt610(%d) action: get serial number (SS)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"SS"]; }
+- (void) getSoftwareVersion         { BTVLOG(@"Bt610(%d) action: get software version (RV)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"RV"]; }
+- (void) getLastRecord              { BTVLOG(@"Bt610(%d) action: get last record (4 1)\n",[self uniqueIdNumber]); readingLastRecord = YES; [self addCmdToQueue:@"4 1"]; }
+- (void) getChannelSizes            { BTVLOG(@"Bt610(%d) action: get channel sizes (RZ)\n",[self uniqueIdNumber]); [self addCmdToQueue:@"RZ"]; }
 
-- (void) sendNumSamples:(int)aValue { [self addCmdToQueue:[NSString stringWithFormat:@"SN %d",aValue]]; }
-- (void) sendCountingTime:(int)aValue { [self addCmdToQueue:[NSString stringWithFormat:@"ST %d",aValue]]; }
-- (void) sendID:(int)aValue			{ [self addCmdToQueue:[NSString stringWithFormat:@"ID %d",aValue]]; }
-- (void) sendHoldTime:(int)aValue	{ [self addCmdToQueue:[NSString stringWithFormat:@"SH %d",aValue]]; }
+//Set all 6 channel sizes on the device (CS command). Format not documented; sending all six
+//sizes space-separated ("CS 0.3 0.5 0.7 1.0 2.5 5.0"). Verify from the log and adjust if the
+//device expects a different layout.
+- (void) sendChannelSizes
+{
+    NSMutableString* cmd = [NSMutableString stringWithString:@"CS"];
+    int i;
+    for(i=0;i<6;i++){
+        NSString* sz = [self channelSize:i];
+        NSLog(@"The channel size: %@", sz);
+        [cmd appendFormat:@" %@",([sz length]>0 ? sz : @"0")];
+    }
+    BTVLOG(@"Bt610(%d) action: set channel sizes -> '%@'\n",[self uniqueIdNumber],cmd);
+    [self addCmdToQueue:cmd];
+}
+
+- (void) sendNumSamples:(int)aValue { BTVLOG(@"Bt610(%d) action: set num samples (SN %d)\n",[self uniqueIdNumber],aValue); [self addCmdToQueue:[NSString stringWithFormat:@"SN %d",aValue]]; }
+- (void) sendCountingTime:(int)aValue { BTVLOG(@"Bt610(%d) action: set sample time (ST %d)\n",[self uniqueIdNumber],aValue); [self addCmdToQueue:[NSString stringWithFormat:@"ST %d",aValue]]; }
+- (void) sendID:(int)aValue			{ BTVLOG(@"Bt610(%d) action: set location (ID %d)\n",[self uniqueIdNumber],aValue); [self addCmdToQueue:[NSString stringWithFormat:@"ID %d",aValue]]; }
+- (void) sendHoldTime:(int)aValue	{ BTVLOG(@"Bt610(%d) action: set hold time (SH %d)\n",[self uniqueIdNumber],aValue); [self addCmdToQueue:[NSString stringWithFormat:@"SH %d",aValue]]; }
 //CU and TU must be sent as separate ESC-framed commands: the device resets its input
 //buffer on every ESC, so combining them in one frame discards all but the last command.
-//- (void) sendTempUnit:(int)aTempUnit countUnits:(int)aCountUnit		{ [self sendCountUnits:aCountUnit]; [self sendTempUnits:aTempUnit]; }
-- (void) sendCountUnits:(int)aCountUnit	{ [self addCmdToQueue:[NSString stringWithFormat:@"CU %d",aCountUnit]]; }
-- (void) sendTempUnits:(int)aTempUnit	{ [self addCmdToQueue:[NSString stringWithFormat:@"TU %d",aTempUnit]]; }
+- (void) sendCountUnits:(int)aCountUnit	{ BTVLOG(@"Bt610(%d) action: set count units (CU %d)\n",[self uniqueIdNumber],aCountUnit); [self addCmdToQueue:[NSString stringWithFormat:@"CU %d",aCountUnit]]; }
+- (void) sendTempUnits:(int)aTempUnit	{ BTVLOG(@"Bt610(%d) action: set temp units (TU %d)\n",[self uniqueIdNumber],aTempUnit); [self addCmdToQueue:[NSString stringWithFormat:@"TU %d",aTempUnit]]; }
 - (void) probe						{ probing = YES; [self getOpStatus]; }
 - (void) getOpStatus                { [self addCmdToQueue:@"OP"]; }
 
@@ -759,7 +801,7 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 - (void) writeSettingsToDevice
 {
 	if([serialPort isOpen]){
-		NSLog(@"Bt610(%d): Loading all ORCA settings to device...\n",[self uniqueIdNumber]);
+		BTVLOG(@"Bt610(%d) action: load all ORCA settings to device\n",[self uniqueIdNumber]);
 		[self setDate];
 		[self sendID:location];
 		[self sendHoldTime:holdTime];
@@ -823,14 +865,13 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 
 		//On Start, push ALL ORCA settings to the machine (overwriting whatever is there),
 		//then begin the run so the counter always runs with ORCA's configuration.
-		[self writeSettingsToDevice];
-		[self getChannelSizes];   //refresh channel sizes so plot/InfluxDB names are current
+		[self writeSettingsToDevice];   //push settings only (channel sizes are read on port open)
         [self enqueueCmd:@"++Delay"];
 
 		[self sendStart];
         [self enqueueCmd:@"++Delay"];
         [self startDataArrivalTimeout];
-		NSLog(@"Bt610(%d) Starting particle counter: %@ \n",[self uniqueIdNumber], [self countingModeString]);
+		NSLog(@"Bt610(%d) Detection started: %@ \n",[self uniqueIdNumber], [self countingModeString]); //always logged (not gated by verbose)
         [self checkCycle];
 	}
 }
@@ -840,10 +881,11 @@ NSString* ORBt610Lock = @"ORBt610Lock";
 - (void) stopCycle
 {
 	if([self running] && [serialPort isOpen]){
+		//log the completed cycle count BEFORE resetting it to 0
+		NSLog(@"Bt610(%d) Detection ended. Number of Cycles %d\n",[self uniqueIdNumber], [self cycleNumber]);
 		[self setCycleNumber:0];
 		[self sendEnd];
         [self cancelDataArrivalTimeout];
-		NSLog(@"Bt610(%d) Stopping particle counter. Number of Cycles %d\n",[self uniqueIdNumber], [self cycleNumber]);
 	}
 }
 
@@ -1061,7 +1103,6 @@ NSString* ORBt610Lock = @"ORBt610Lock";
         [self getSampleTime];         //ST -> start/sample time
         [self getHoldTime];           //SH -> hold time
         [self addCmdToQueue:@"SN"];   //number of samples / mode
-        [self getChannelSizes];       //RZ -> channel size list
         //Command "1" returns the identity report (serial #, firmware version).
         [self getUnits];
     }

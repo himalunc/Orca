@@ -30,6 +30,7 @@
 	IBOutlet NSTextField*	dumpInProgressField;
 	IBOutlet NSTextField*	timedOutField;
 	IBOutlet NSButton*		isLogCB;
+	IBOutlet NSButton*		verboseCB;
 	IBOutlet NSTextField*	holdTimeField;
     IBOutlet NSTextField*   pollTimeField;
 	IBOutlet NSTextField*	tempUnitsField;
@@ -43,6 +44,7 @@
 
 	IBOutlet NSMatrix*		countMatrix;
 	IBOutlet NSMatrix*		channelSizeMatrix;
+	IBOutlet NSMatrix*		channelSizeEditMatrix;
 
     IBOutlet NSButton*      lockButton;
     IBOutlet NSButton*      clearAllButton;
@@ -99,6 +101,7 @@
 - (void) timedOutChanged:(NSNotification*)aNote;
 - (void) actualDurationChanged:(NSNotification*)aNote;
 - (void) isLogChanged:(NSNotification*)aNote;
+- (void) verboseChanged:(NSNotification*)aNote;
 - (void) holdTimeChanged:(NSNotification*)aNote;
 - (void) pollTimeChanged:(NSNotification*)aNote;
 - (void) tempUnitsChanged:(NSNotification*)aNote;
@@ -124,6 +127,7 @@
 
 #pragma mark ***Actions
 - (IBAction) isLogAction:(id)sender;
+- (IBAction) verboseAction:(id)sender;
 - (IBAction) holdTimeAction:(id)sender;
 - (IBAction) pollTimeAction:(id)sender;
 - (IBAction) tempUnitsAction:(id)sender;
@@ -137,6 +141,7 @@
 - (IBAction) countUnitsAction:(id)sender;
 - (IBAction) numSamplesAction:(id)sender;
 - (IBAction) countingModeAction:(id)sender;
+- (IBAction) setChannelSizesAction:(id)sender;
 - (IBAction) dumpAllDataAction:(id)sender;
 - (IBAction) dumpNewDataAction:(id)sender;
 - (IBAction) clearAllAction:(id)sender;

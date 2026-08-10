@@ -287,6 +287,11 @@
                      selector : @selector(isLogChanged:)
                          name : ORBt610ModelIsLogChanged
 						object: model];
+
+    [notifyCenter addObserver : self
+                     selector : @selector(verboseChanged:)
+                         name : ORBt610ModelVerboseChanged
+						object: model];
 	
     [notifyCenter addObserver : self
                      selector : @selector(actualDurationChanged:)
@@ -363,6 +368,7 @@
 	[self tempUnitsChanged:nil];
 	[self holdTimeChanged:nil];
 	[self isLogChanged:nil];
+	[self verboseChanged:nil];
 	[self actualDurationChanged:nil];
 	[self timedOutChanged:nil];
 	[self dumpInProgressChanged:nil];
@@ -390,15 +396,18 @@
     //hardcoded sizes. Use [matrix cells] (row-major) so it works regardless of whether the
     //matrix is laid out as rows or columns.
     NSArray* cells = [channelSizeMatrix cells];
+    NSArray* editCells = [channelSizeEditMatrix cells];  //editable copy in Advanced Setting
     int i;
     for(i=0;i<6;i++){
         NSString* sz = [model channelSize:i];
         if(i < (int)[cells count]) [[cells objectAtIndex:i] setStringValue:sz];
+        if(i < (int)[editCells count]) [[editCells objectAtIndex:i] setStringValue:sz];
         if([sz length]>0){
             [(ORTimeLinePlot*)[plotter0 plotWithTag:i] setName:[NSString stringWithFormat:@"%@ µm",sz]];
         }
     }
     [channelSizeMatrix setNeedsDisplay:YES];
+    [channelSizeEditMatrix setNeedsDisplay:YES];
     //setName: only stores the name; force the legend to re-lay-out with the new names
     [plotter0 setShowLegend:YES];
     [plotter0 setNeedsDisplay:YES];
@@ -429,6 +438,11 @@
 	[isLogCB setIntValue: [model isLog]];
 	[[plotter0 yAxis] setLog:[model isLog]];
 	[plotter0 setNeedsDisplay:YES];
+}
+
+- (void) verboseChanged:(NSNotification*)aNote
+{
+	[verboseCB setIntValue: [model verbose]];
 }
 
 - (void) holdTimeChanged:(NSNotification*)aNote
@@ -686,7 +700,12 @@
 
 - (void) isLogAction:(id)sender
 {
-	[model setIsLog:[sender intValue]];	
+	[model setIsLog:[sender intValue]];
+}
+
+- (IBAction) verboseAction:(id)sender
+{
+	[model setVerbose:[sender intValue]];
 }
 
 - (void) holdTimeAction:(id)sender
@@ -716,6 +735,25 @@
 		[model setNumSamples:1];               //switch to Single: default to 1 sample
 	}
 	[self updateButtons];
+}
+
+//Advanced Setting: take the (editable) channel sizes from the matrix and write them to the
+//machine via the CS command.
+- (IBAction) setChannelSizesAction:(id)sender
+{
+	[self endEditing];   //commit any in-progress cell edit
+	[channelSizeEditMatrix validateEditing];   //flush the active field editor into the cell
+	NSArray* editCells = [channelSizeEditMatrix cells];
+	NSLog(@"Bt610: channelSizeEditMatrix rows=%ld cols=%ld cellCount=%lu\n",
+		  (long)[channelSizeEditMatrix numberOfRows],(long)[channelSizeEditMatrix numberOfColumns],(unsigned long)[editCells count]);
+	int i;
+	for(i=0;i<6 && i<(int)[editCells count];i++){
+		NSString* sz = [[[editCells objectAtIndex:i] stringValue]
+						stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+		NSLog(@"Bt610:   editCell[%d] = '%@'\n",i,sz);
+		[model setChannelSize:i value:sz];
+	}
+	[model sendChannelSizes];   //CS command
 }
 
 - (IBAction) tempUnitsAction:(id)sender
