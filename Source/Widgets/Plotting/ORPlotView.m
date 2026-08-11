@@ -22,6 +22,22 @@
 #import "ORPlot.h"
 #import "ORAxis.h"
 #import "ORPlotAttributeStrings.h"
+#import <objc/runtime.h>
+
+// Helper class to detect when the delegate is deallocated
+@interface ORDelegateDeathDetector : NSObject
+@property (assign, nonatomic) id plotView;
+@end
+
+@implementation ORDelegateDeathDetector
+- (void)dealloc {
+    // When the delegate dies, clear the plot view's reference to it
+    if (_plotView && [_plotView respondsToSelector:@selector(setDelegate:)]) {
+        [_plotView setDelegate:nil];
+    }
+    [super dealloc];
+}
+@end
 
 @implementation ORPlotView
 
@@ -84,7 +100,21 @@
 
 - (void) setDelegate:(id)aDelegate
 {
+	// Remove old death detector from previous delegate
+	if (delegate) {
+		objc_setAssociatedObject(delegate, "ORPlotViewDelegateDeathDetector", nil, OBJC_ASSOCIATION_RETAIN);
+	}
+	
     delegate = aDelegate;
+	
+	// Attach a death detector to the new delegate
+	// When the delegate deallocates, it will automatically clear our reference
+	if (aDelegate) {
+		ORDelegateDeathDetector *detector = [[ORDelegateDeathDetector alloc] init];
+		detector.plotView = self;
+		objc_setAssociatedObject(aDelegate, "ORPlotViewDelegateDeathDetector", detector, OBJC_ASSOCIATION_RETAIN);
+		[detector release];
+	}
 }
 
 - (id) delegate 
