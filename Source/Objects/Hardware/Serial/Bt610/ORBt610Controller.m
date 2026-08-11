@@ -741,17 +741,22 @@
 //machine via the CS command.
 - (IBAction) setChannelSizesAction:(id)sender
 {
-	[self endEditing];   //commit any in-progress cell edit
-	[channelSizeEditMatrix validateEditing];   //flush the active field editor into the cell
+	[self endEditing];                         //commit any in-progress cell edit
+	[channelSizeEditMatrix validateEditing];   //flush the active field editor into its cell
 	NSArray* editCells = [channelSizeEditMatrix cells];
-	NSLog(@"Bt610: channelSizeEditMatrix rows=%ld cols=%ld cellCount=%lu\n",
-		  (long)[channelSizeEditMatrix numberOfRows],(long)[channelSizeEditMatrix numberOfColumns],(unsigned long)[editCells count]);
+
+	//Read ALL six values FIRST. Applying setChannelSize: posts a notification that repopulates
+	//this matrix from the model, which would clobber cells not yet read (that's why only CH0
+	//was taking before). So snapshot everything, then apply.
+	NSMutableArray* sizes = [NSMutableArray arrayWithCapacity:6];
 	int i;
-	for(i=0;i<6 && i<(int)[editCells count];i++){
-		NSString* sz = [[[editCells objectAtIndex:i] stringValue]
-						stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-		NSLog(@"Bt610:   editCell[%d] = '%@'\n",i,sz);
-		[model setChannelSize:i value:sz];
+	for(i=0;i<6;i++){
+		NSString* sz = (i < (int)[editCells count]) ?
+			[[[editCells objectAtIndex:i] stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] : @"";
+		[sizes addObject:sz];
+	}
+	for(i=0;i<6;i++){
+        [model setChannelSize:i value:[sizes objectAtIndex:i]];
 	}
 	[model sendChannelSizes];   //CS command
 }
