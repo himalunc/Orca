@@ -22,6 +22,22 @@
 #import "ORPlotView.h"
 #import "ORAxis.h"
 #import "OR1dRoi.h"
+#import <objc/runtime.h>
+
+// Helper class to detect when the data source is deallocated
+@interface ORDataSourceDeathDetector : NSObject
+@property (assign, nonatomic) id plot;
+@end
+
+@implementation ORDataSourceDeathDetector
+- (void)dealloc {
+    // When the data source dies, clear the plot's reference to it
+    if (_plot && [_plot respondsToSelector:@selector(setDataSource:)]) {
+        [_plot setDataSource:nil];
+    }
+    [super dealloc];
+}
+@end
 
 @implementation ORPlotWithROI
 #pragma mark ***Initialization 
@@ -30,13 +46,28 @@
     [roi setDataSource:nil];
 	[roi release];
     roi = nil; //because the super class accesses the roi indirectly later in the dealloc process
+    dataSource = nil; //prevent any drawing attempts during super dealloc
 	[super dealloc];
 }
 
 - (void) setDataSource:(id)ds
 {
+	// Remove old death detector from previous data source
+	if (dataSource) {
+		objc_setAssociatedObject(dataSource, "ORPlotDataSourceDeathDetector", nil, OBJC_ASSOCIATION_RETAIN);
+	}
+	
 	[roi setDataSource:ds];
 	[super setDataSource:ds];
+	
+	// Attach a death detector to the new data source
+	// When the data source deallocates, it will automatically clear our reference
+	if (ds) {
+		ORDataSourceDeathDetector *detector = [[ORDataSourceDeathDetector alloc] init];
+		detector.plot = self;
+		objc_setAssociatedObject(ds, "ORPlotDataSourceDeathDetector", detector, OBJC_ASSOCIATION_RETAIN);
+		[detector release];
+	}
 }
 
 - (id) roi	{ return roi; }
